@@ -1,0 +1,37 @@
+torch_seed: 12345 # for reproducibility
+
+inputs:
+  datapath: /pbs/home/g/gsaha/work/Regression/Input/DY_Cat_20231206_155537
+  node_file: DY_nodes.parquet
+  target_file: DY_targets.parquet
+  global_file: DY_globals.parquet
+
+outputpath: /pbs/home/g/gsaha/work/Regression/Output/Output
+
+train_frac: 0.80
+
+hparamdict:
+  nepochs: 50
+  batchlen: 1000
+  lr: 0.01
+  momentum: 0.9
+  betas: (0.9, 0.999)
+  lr_stepsize: 5
+  save_every: 5
+
+modelpath: /pbs/home/g/gsaha/work/Regression/Output/TrainedModels
+
+GPU: single # multi
+
+train:
+  cmd: False
+
+val:
+  cmd: False
+
+test:
+  cmd: False
+  final_model_path: /pbs/home/g/gsaha/work/Regression/Output/TrainedModels_20231207_160456/GNN_DDP_epoch5.pt
+
+evaluate:
+  cmd: False
