@@ -203,10 +203,11 @@ def filldict(dict={}, colname="", array=None, iteridx=0):
 # ----------------------------------------------------------------------------------------------------- #
 #                                            Node features                                              #
 # ----------------------------------------------------------------------------------------------------- #
-def getnode_dict_in(taus: ak.Array, jets: ak.Array):
+def getnode_dict_in(taus: ak.Array, jets: ak.Array, met: ak.Array):
     nodeDict = {
         "Tau": taus, 
         "Jet": jets,
+        "MET": met
     }
     return nodeDict
 
@@ -268,6 +269,66 @@ def getnodefeature(events: ak.Array,
                 print(temp_concat)
                 temp_concat = scalefeat_nest(temp_concat, 1)
             tempdict[f"{tag}_{fname}"] = temp_concat
+    return tempdict
+
+
+
+def getmanualfeature()
+
+
+
+
+
+
+
+
+def getnodefeature(col: ak.Array,
+                   tag: str="",
+                   fnames: list=[], 
+                   fillNone: Optional[bool]=False,
+                   StdScalar: Optional[bool]=False,
+                   **kwargs) -> ak.Array:
+    print("\nGetting node features ...")
+    tempdict = {}
+    #templist = []
+    for fname_ in fnames:
+        iscat = True if "@cat" in fname_ else False
+        fname = fname_.replace("@cat", "") if iscat else fname_
+        templist = []
+        if fname in col.fields:
+            print(f'\t\t{fname} is found in the {obj} fields')
+            temp = col[fname]
+            #if iscat:
+            #    temp = temp + 10 
+            #if StdScalar:
+            #    if not iscat:
+            #        temp = scalefeat(temp)
+            #print(ak.num(temp, axis=1))
+            #tempdict[f"{tag}_{obj.lower()}_{i}_{fname}"] = ak.to_numpy(temp).reshape(-1)
+        else:
+            print(f'\t\t{fname} is NOT found in the {obj} fields')
+            temp = ak.zeros_like(col["pt"], dtype=np.float32)
+            #print(ak.num(temp, axis=1))
+            #templist.append(temp)
+            #print(temp)
+            
+            templist.append(temp)
+    temp_concat = ak.concatenate(templist, axis=-1)
+    #tempdict[f"{tag}_{fname}"] = temp_concat
+    if iscat:
+        unique_vals = np.unique(ak.ravel(temp_concat).to_numpy())
+        for val in unique_vals:
+            if val == 0: continue
+            #lfrom IPython import embed; embed()
+            #tempdict[f"{tag}_{fname}_{int(val)}"] = ak.where(temp_concat == val, temp_concat-10, ak.zeros_like(temp_concat))
+            tempdict[f"{tag}_{fname}_{int(val)}"] = ak.where(temp_concat == int(val),
+                                                             ak.ones_like(temp_concat),
+                                                             ak.zeros_like(temp_concat))
+    else:
+        if StdScalar:
+            print(temp_concat)
+            temp_concat = scalefeat_nest(temp_concat, 1)
+        tempdict[f"{tag}_{fname}"] = temp_concat
     return tempdict
 
             
@@ -347,70 +408,6 @@ def getglobalfeature(events: ak.Array,
     return tempdict
 
 
-# ----------------------------------------------------------------------------------------------------- #
-#                                            edge feats                                                 #
-# ----------------------------------------------------------------------------------------------------- #
-def getedge_dict_in(taus: ak.Array, jets: ak.Array):
-    edgeDict = {
-        "coll": ak.concatenate([taus, jets], axis=1), 
-        "num": 6 # num_nodes
-    }
-    return edgeDict
-
-
-def get_edgeidx_comb(num_nodes: int):
-    # hard coded
-    nodeidxs = list(range(num_nodes))
-    
-    edgeidxs_ = list(itertools.combinations(nodeidxs, 2))
-    edgeidxs = []
-    for item in edgeidxs_:
-        item_ = list(item)
-        edgeidxs.append(item_)
-        #edgeidxs.append(item_[::-1])
-    #print(edgeidxs)
-    return edgeidxs
-
-
-def getedgefeature(events: ak.Array, 
-                   tag="",
-                   colDict = {},
-                   fillNone=False,
-                   StdScalar=False):
-    print("\nGetting edge features ...")
-    nobjs = colDict["num"]
-    
-    edgeidxs = get_edgeidx_comb(nobjs)
-    
-    coll = 1 * colDict["coll"]
-    tempdict = {}
-    for comb in edgeidxs:
-        ##print(comb)
-        idx1 = comb[0]
-        idx2 = comb[1]
-        #from IPython import embed; embed()
-        temp_dr = ak.fill_none(ak.pad_none(ak.firsts(coll[:,idx1:(1+idx1)].metric_table(coll[:,idx2:(1+idx2)]), axis=2), 1, axis=1), 0.0)
-        #print(f"DR: {temp_dr}")
-        temp_dphi = ak.fill_none(ak.pad_none(ak.firsts(coll[:,idx1:(1+idx1)].metric_table(coll[:,idx2:(1+idx2)], metric = lambda a, b: a.delta_phi(b)), axis=2), 1, axis=1), 0.0)
-        #print(f"DPhi: {temp_dphi}")
-        temp_deta = ak.fill_none(ak.pad_none(ak.firsts(coll[:,idx1:(1+idx1)].metric_table(coll[:,idx2:(1+idx2)], metric = lambda a, b: a.eta - b.eta), axis=2), 1, axis=1), 0.0)
-        #print(f"DEta: {temp_deta}")
-
-        #print(f"temp_dr :{temp_dr}")
-        #print(f"temp_dphi :{temp_dphi}")
-        #print(f"temp_deta :{temp_deta}")
-        if StdScalar:
-            temp_dr = scalefeat(temp_dr)
-            temp_dphi = scalefeat(temp_dphi)
-            temp_deta = scalefeat(temp_deta)
-            
-        tempdict[f"{tag}_idx_{idx1}_{idx2}"] = ak.to_numpy(ak.ones_like(temp_dr)).reshape(-1)
-        tempdict[f"{tag}_dr_{idx1}_{idx2}"] = ak.to_numpy(temp_dr).reshape(-1)
-        tempdict[f"{tag}_dphi_{idx1}_{idx2}"] = np.abs(ak.to_numpy(temp_dphi).reshape(-1))
-        tempdict[f"{tag}_deta_{idx1}_{idx2}"] = np.abs(ak.to_numpy(temp_deta).reshape(-1))
-        
-    return tempdict
-# -------------------------------------------- #
 
 
 # ----------------------------------------------------------------------------------------------------- #
@@ -486,13 +483,34 @@ def get_events_dict(events:ak.Array, scale: bool):
     
     # event and object masks applied
     events = events[where]
+
+    # indices
+    muo_sel_idx = muo_sel_idx[where]
+    ele_sel_idx = ele_sel_idx[where]
+    tau_sel_idx = tau_sel_idx[where]
+    jet_sel_idx = jet_sel_idx[where]
+    gentaunu_sel_idx = gentaunu_sel_idx[where]
+    gentau_sel_idx = gentau_sel_idx[where]
+    # objects
     muons = muons[where]
     electrons = electrons[where]
     jets = jets[where]
     taus = taus[where]
     gentaunus = taus.nearest(gentaunus[where], threshold=0.4)
     gentaus = taus.nearest(gentaus[where], threshold=0.4)
-
+    tauprods = tauprods[where]
+    # get tau prods for taus
+    tau1_idx = tau_sel_idx[:,:1]
+    tau1_idx_brdcst, tauprod_tauIdx = ak.broadcast_arrays(ak.firsts(tau1_idx,axis=1), tauprods.tauIdx)
+    tau1prod_mask = tauprod_tauIdx == tau1_idx_brdcst
+    tau2_idx = tau_sel_idx[:,1:2]
+    tau2_idx_brdcst, _ = ak.broadcast_arrays(ak.firsts(tau2_idx,axis=1), tauprods.tauIdx)
+    tau2prod_mask = tauprod_tauIdx == tau2_idx_brdcst
+    tau1prods = tauprods[tau1prod_mask]
+    tau2prods = tauprods[tau2prod_mask]
+    #print(tau1_prods.tauIdx)
+    #print(tau2_prods.tauIdx)
+    tauprods_concat = ak.concatenate([tau1prods[:,None], tau2prods[:,None]], axis=1)
     
     in_nodeDict = getnode_dict_in(taus, jets)
     in_edgeDict = getedge_dict_in(taus, jets)

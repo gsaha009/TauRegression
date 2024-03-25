@@ -8,6 +8,7 @@ import argparse
 # ext array library
 import awkward as ak
 import numpy as np
+import pandas as pd
 from typing import Optional
 
 # plotting tools
@@ -19,7 +20,7 @@ import torch
 import torch.nn as nn
 os.environ['TORCH'] = torch.__version__
 print(torch.__version__)
-from torch_geometric.data import Data, Dataset
+from torch_geometric.data import Data, Dataset, InMemoryDataset
 from torch_geometric.loader import DataLoader
 from torch_geometric.nn import GCNConv, GATConv, GATv2Conv, NNConv, global_add_pool, global_mean_pool, MetaLayer, MessagePassing
 import torch.nn.functional as F
@@ -31,7 +32,8 @@ import networkx as nx
 
 # user import
 from util import obj, PlotUtil, count_model_params, plteval, plteval_v2
-from buildDataset import ZtoTauTauDataset
+#from buildDataset import ZtoTauTauDataset
+from buildDatasetFromDF import ZtoTauTauDataset
 from buildModel import NuNet, get_model_kwargs
 from train import Trainer
 
@@ -48,9 +50,12 @@ def main(configfile: str, doplot: bool, gpu_id: int):
     torch.manual_seed(config_dict.torch_seed)
 
     input_path = config_dict.inputs.datapath
-    node_file = f"{input_path}/{config_dict.inputs.node_file}"
-    target_file = f"{input_path}/{config_dict.inputs.target_file}"
-    global_file = f"{input_path}/{config_dict.inputs.global_file}"
+    #node_file = f"{input_path}/{config_dict.inputs.node_file}"
+    #target_file = f"{input_path}/{config_dict.inputs.target_file}"
+    #global_file = f"{input_path}/{config_dict.inputs.global_file}"
+    _df_name = config_dict.df_name
+    #_df = f"{input_path}/{config_dict.inputs.dataframe}"
+    #df = pd.read_hdf(_df)
 
     outputpath = config_dict.outputpath
     outdir = f"{outputpath}_{datetime_tag}"
@@ -65,45 +70,44 @@ def main(configfile: str, doplot: bool, gpu_id: int):
     final_model_path = config_dict.test.final_model_path
     doeval = config_dict.evaluate.cmd
     
-    node_info = ak.from_parquet(node_file)
-    target_info = ak.from_parquet(target_file)
-    global_info = ak.from_parquet(global_file)
+    #node_info = ak.from_parquet(node_file)
+    #target_info = ak.from_parquet(target_file)
+    #global_info = ak.from_parquet(global_file)
 
-    events_record = {}
-    events_record["node_feats"] = node_info
-    events_record["target_feats"] = target_info
-    events_record["global_feats"] = global_info
+    #events_record = {}
+    #events_record["node_feats"] = node_info
+    #events_record["target_feats"] = target_info
+    #events_record["global_feats"] = global_info
 
     
-    if doplot:
-        print("Plotting")
-        plotter = PlotUtil(events_record, outdir)
-        plotter.plot_nodes((40,40))
-        plotter.plot_targets((20,12))
-        plotter.plot_globals()
+    #if doplot:
+    #    print("Plotting")
+    #    plotter = PlotUtil(events_record, outdir)
+    #    plotter.plot_nodes((40,40))
+    #    plotter.plot_targets((20,12))
+    #    plotter.plot_globals()
 
     print("Preparing PyG Dataset")
-    dataset = ZtoTauTauDataset(events_record, gpu_id)
+    #dataset = ZtoTauTauDataset(df, gpu_id)
+    #dataset = ZtoTauTauDataset(gpu_id, _df_name, root="data/")
+    dataset = ZtoTauTauDataset("/pbs/home/g/gsaha/work/TauRegression/GNN/data/", 
+                               _df_name, 
+                               gpu_id)
 
-    """
     for i in range(10):
         data = dataset.get(i)
         print(data)
-    """
 
     if doplot:
         print("nx Graph")
         plt_nx_graph(dataset, outdir=outdir)
     
-
     train_dataset, val_dataset, test_dataset = dataset_split(dataset, config_dict.train_frac)
-
     train_loader, train_sampler, val_loader, test_loader = prepare_dataloaders(train_dataset, 
                                                                                val_dataset, 
                                                                                test_dataset, 
                                                                                config_dict.hparamdict.batchlen, 
                                                                                False)
-
     model_kwargs = get_model_kwargs()
     model = NuNet(**model_kwargs)
 
@@ -162,8 +166,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-
-    config_ = args.config
-    plot_ = args.plot
+    config_  = args.config
+    plot_    = args.plot
 
     main(config_, plot_, gpu_id)

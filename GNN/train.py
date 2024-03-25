@@ -10,6 +10,7 @@ from torch_geometric.loader import DataLoader
 import torch.nn.functional as F
 import torch.optim as optim
 import torchmetrics
+from tqdm import tqdm
 
 
 class Trainer:
@@ -31,7 +32,7 @@ class Trainer:
         self.trainloader = trainloader
         self.valloader = valloader
         self.testloader = testloader
-        self.criterion = nn.HuberLoss()  #nn.MSELoss()  # #nn.L1Loss()
+        self.criterion = nn.MSELoss() #nn.HuberLoss()  #nn.MSELoss()  # #nn.L1Loss()
         self.doval = dovalidate
 
         # Optimiser
@@ -71,7 +72,7 @@ class Trainer:
 
         out = self.model(src)
         loss = self.criterion(out, tgt)
-        print(loss)
+        #print(loss)
         loss.backward()
         self.optimizer.step()
         
@@ -83,8 +84,8 @@ class Trainer:
         val_loss = 0.0
         val_acc = 0.0
         start = float(time.time())
-        for ibatch in range(len(self.trainloader)):
-            print(f"Batch: {ibatch}")
+        for ibatch in tqdm(range(len(self.trainloader)), ascii=True):
+            #print(f"Batch: {ibatch}")
             data_batched = next(iter(self.trainloader))
             src = data_batched.to(self.gpu_id)
             tgt = data_batched.y.to(self.gpu_id)
@@ -130,7 +131,7 @@ class Trainer:
 
         end = float(time.time())
         print(
-            f"{'-' * 140}\n[GPU{self.gpu_id}] Epoch {epoch:2d} | Batchsize: {self.h_params.batchlen} | Steps: {len(self.trainloader)} | LR: {self.optimizer.param_groups[0]['lr']:.4f} | Loss: {train_loss / len(self.trainloader):.4f} | R2: {self.train_acc.compute().item():.2f} | Val-Loss: {val_loss / len(self.valloader):.4f} | Val-R2: {val_acc:.2f} | time: {(end - start)/60} min",
+            f"\n[GPU{self.gpu_id}] Epoch {epoch:2d} | Batchsize: {self.h_params.batchlen} | Steps: {len(self.trainloader)} | LR: {self.optimizer.param_groups[0]['lr']:.4f} | Loss: {train_loss / len(self.trainloader):.4f} | R2: {self.train_acc.compute().item():.2f} | Val-Loss: {val_loss / len(self.valloader):.4f} | Val-R2: {val_acc:.2f} | time: {round((end - start)/60,3)} min",
             flush=True,
         )
 

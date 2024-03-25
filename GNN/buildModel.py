@@ -182,8 +182,8 @@ class NuNet(torch.nn.Module):
 
 def get_model_kwargs():
     return {
-        "node_feat_size": 19,
-        "global_feat_size": 14,
+        "node_feat_size": 22,
+        "global_feat_size": 11,
         "num_classes": 6,
         "depth": 2,
         "dropout": True
