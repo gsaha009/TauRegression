@@ -41,4 +41,4 @@ for idx, key in enumerate(keys):
     ax.set_xlabel(f"{key}")
     #ax.legend()
 plt.tight_layout()
-plt.savefig(f'{args.outout}.png', dpi=300)
+plt.savefig(f'{args.output}', dpi=300)

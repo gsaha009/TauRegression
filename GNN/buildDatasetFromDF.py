@@ -18,14 +18,22 @@ os.environ['TORCH'] = torch.__version__
 #print(torch.__version__)
 
 from torch_geometric.data import Data, Dataset, InMemoryDataset
-
+from util import PlotUtil
 
 
 class ZtoTauTauDataset(InMemoryDataset):
     def __init__(self,
                  root: str,
-                 df_name: str, 
-                 gpu_id: str, 
+                 df_name: str,
+                 proc_name: str,
+                 gpu_id: str,
+                 plotdir: str,
+                 node_types: list,
+                 node_feats: list,
+                 #target_types: list,
+                 target_feats: list,
+                 global_feats: list,
+                 do_plot: bool = True,
                  transform : Optional[Callable] = None, 
                  pre_transform : Optional[Callable] = None,
                  pre_filter : Optional[Callable] = None,
@@ -38,20 +46,16 @@ class ZtoTauTauDataset(InMemoryDataset):
         print(self.root)
         self.df_name = df_name
         print(self.df_name)
+        self.proc_name = proc_name
         self.gpu_id = gpu_id
-        self.nodetypes = ["tau", "jet"]
-        self.nodefeats = ["pt", "eta", "phi", "mass",
-                          "rawIsodR03", "rawMVAnewDM2017v2", "leadTkPtOverTauPt", "btagPNetB",
-                          "rawPNetVSe", "rawPNetVSjet", "rawPNetVSmu", 
-                          "charge_1", "charge_-1", 
-                          "decayModePNet_0", "decayModePNet_1", "decayModePNet_2", 
-                          "decayModePNet_10", "decayModePNet_11",
-                          "npf", "ptfrac", "pf_dphi_pt_frac", "pf_deta_pt_frac"]
-        self.globalfeats = ["nJet", "nPV", "HT", "MT_total", "pt_MET", "phi_MET", 
-                            "covXX_MET", "covXY_MET", "covYY_MET", "sumEt_MET", 
-                            "significance_MET"]
-        self.targettypes = ["gentaunu"]
-        self.targetfeats = ["px", "py", "pz"]
+        self.nodetypes = node_types
+        self.nodefeats = node_feats
+        #self.targettypes = target_types
+        self.targetfeats = target_feats
+        self.globalfeats = global_feats
+        
+        self.plotdir = plotdir
+        self.doplot = do_plot
 
         print(f"mother constructor called")
         super(ZtoTauTauDataset, self).__init__(root,
@@ -62,6 +66,9 @@ class ZtoTauTauDataset(InMemoryDataset):
 
         self.load(self.processed_paths[0])
 
+    #@property
+    #def raw_dir(self) -> str:
+    #    return os.path.join(self.root, 'raw', 'norm')
 
     @property
     def raw_file_names(self):
@@ -72,7 +79,7 @@ class ZtoTauTauDataset(InMemoryDataset):
 
     @property
     def processed_file_names(self):
-        return 'data.pt'
+        return self.proc_name
 
     def _add_dummies(self, col_names):
         _df = self.df.copy(deep=True)
@@ -82,13 +89,17 @@ class ZtoTauTauDataset(InMemoryDataset):
                 print(f"WARNING: {col_name} not in df, adding zeros")
                 _df[col_name] = 0.0
 
+        _df = _df.fillna(0)
         return _df
 
     def _col_key_list(self, feat: str, max_particles: int, prefix: str) -> list :
         if max_particles > 0:
             return [f'{feat}_{prefix}_{i+1}' for i in range(max_particles)]
         else:
-            return [f'{feat}_{prefix}']
+            if prefix == None:
+                return [f'{feat}']
+            else:
+                return [f'{feat}_{prefix}']
 
 
     def _transform_from_dataframe(self):
@@ -106,7 +117,8 @@ class ZtoTauTauDataset(InMemoryDataset):
         #_df = self.df.copy(deep=True)
         #df = self._add_dummies(_df, tau_feat_names + jet_feat_names)
         df = self._add_dummies(tau_feat_names + jet_feat_names)
-        #df = pd.concat([self.df.copy(deep=True), df_temp], axis=1) 
+        #df = pd.concat([self.df.copy(deep=True), df_temp], axis=1)
+        
         print("df with all columns :--> ")
         print(list(df.keys()))
         print(df.head(10))
@@ -121,10 +133,34 @@ class ZtoTauTauDataset(InMemoryDataset):
             #print(f"tau columns: {tau_cols}")
             jet_cols = self._col_key_list(feat, 10, "jet")
             #print(f"jet columns: {jet_cols}")
-
-            tau_feats = ak.Array(df[tau_cols].values)
+            tau_col_vals = df[tau_cols].values
+            assert not np.any(np.isnan(tau_col_vals))
+            #temp_tau_col_vals = tau_col_vals.flatten()
+            #print(np.isnan(temp_tau_col_vals), np.sum(temp_tau_col_vals))
+            tau_feats = ak.Array(tau_col_vals)
+            """
+            if i==8: 
+                #print(f"tau: {list(tau_col_vals)}")
+                #print(ak.to_list(tau_feats))
+                #assert not ak.any(ak.isnan(tau_col_vals))
+                print(tau_feats.type, tau_feats[0].type)
+                print(type(tau_feats), type(tau_feats[0]))
+                #temp = np.where(np.isnan(tau_col_vals), 0, np.ones_like(tau_col_vals))
+                #print(list(temp))
+                #assert not np.any(np.isnan(tau_col_vals))
+                #tau_feats_flat = ak.flatten(tau_feats)
+                #print(ak.to_list(tau_feats_flat))
+                #print(tau_feats_flat.type, tau_feats.type)
+                #print(ak.is_none(tau_feats_flat))
+                temp = ak.to_numpy(tau_feats)
+                assert not np.any(np.isnan(temp))
+            """
             #print(f"tau_feats: {tau_feats}")
-            jet_feats = ak.Array(df[jet_cols].values)
+
+            jet_col_vals = df[jet_cols].values
+            #print(f"jet: {list(jet_col_vals)}")
+            #assert not np.any(np.isnan(jet_col_vals))
+            jet_feats = ak.Array(jet_col_vals)
             #print(f"jet_feats: {jet_feats}")
             if i == 0:
                 jet_mask = jet_feats > 0.0
@@ -149,10 +185,15 @@ class ZtoTauTauDataset(InMemoryDataset):
         target_dict = {}
         for feat in self.targetfeats:
             print(f"Target Feature: {feat}")
-            gentaunu_cols = self._col_key_list(feat, 2, "gentaunu")
-            target_feat = ak.Array(df[gentaunu_cols].values)
+            #gentaunu_cols = self._col_key_list(feat, 2, "gentaunu")
+            #gentaunu_cols = self._col_key_list(feat, 2, None)
+            target_feat = ak.Array(df[feat].values)
 
             target_dict[feat] = target_feat
+
+        #extra_target_col = "phicp"
+        #temp_feat = ak.Array(df[extra_target_col].values)
+        #target_dict[extra_target_col] = target_feat
 
         return (node_dict, global_dict, target_dict)
 
@@ -178,9 +219,10 @@ class ZtoTauTauDataset(InMemoryDataset):
         #print(f"nodes_p4: {nodes_p4}")
         
         for node_key in self.node_record.fields:
-        #for node_key in ["pt", "eta", "phi", "mass", "charge"]:
+            #print(f"node feat: {node_key}")
             node_val = self.node_record[node_key]
             temp_x = ak.firsts(node_val[idx:idx+1], axis=0).to_numpy()
+            #print(f"--- val: {temp_x}")
             xs.append(temp_x)
 
         node_feats = np.stack(xs).T
@@ -210,10 +252,16 @@ class ZtoTauTauDataset(InMemoryDataset):
         #print(f"edges_dr : {edges_attr}")
         
         for target_key in self.target_record.fields:
+            #print(f"target feat: {target_key}")
             target_val = self.target_record[target_key]
-            temp_y = ak.firsts(target_val[idx:idx+1], axis=0).to_numpy()
-            ys.append(temp_y[:2])
-            aux_ys.append(temp_y[2:])
+            #temp_y = ak.firsts(target_val[idx:idx+1], axis=0).to_numpy()
+            temp_y = target_val[idx:idx+1].to_numpy()
+            #ys.append(temp_y[:2])
+            #aux_ys.append(temp_y[2:])
+            #print(f"--- val: {temp_y}")
+            ys.append(temp_y)
+            aux_ys.append(temp_y)
+
         target_feats = np.stack(ys).T
         #print(f"target_feats: {target_feats}")
         target_y = torch.tensor(target_feats).to(torch.float32)
@@ -255,21 +303,36 @@ class ZtoTauTauDataset(InMemoryDataset):
         from tqdm import tqdm
         from time import sleep
         print("process called")
-        self.df = pd.read_hdf(self.raw_paths[0])
-        ##self.df = pd.read_hdf(os.path.join(self.root, "raw/GluGluHToTauTauSMdata.h5"))
+        print(self.raw_paths)
+        print(f"self.raw_paths[0]: {self.raw_paths[0]}")
+        
+        #self.df = pd.read_hdf(self.raw_paths[0])
+        self.df = pd.read_hdf(self.raw_file_names)
+        print(f"raw data: {self.df}")
+        #self.df = pd.read_hdf("/pbs/home/g/gsaha/work/TauRegression/GNN/data/raw/GluGluHToTauTauSMdata_00_11.h5")
         zips = self._transform_from_dataframe()
         self.node_record = ak.zip(zips[0])
         self.global_record = ak.zip(zips[1])
         self.target_record = ak.zip(zips[2])
+        if self.doplot:
+            print(" ===> Plotting : Start ===> ")
+            plotter = PlotUtil(self.node_record, 
+                               self.target_record,
+                               self.global_record,
+                               self.plotdir)
+            plotter.plot_nodes((40,40))
+            plotter.plot_targets((20,12))
+            plotter.plot_globals()
+            print(" ===> Plotting : End ===> ")
         datalist = []
         for idx in tqdm(range(len(self.df)), ascii=True):
             data = self.transform_to_torch(idx)
             #print(f"iter: {idx} ---> {data}")
             datalist.append(data)
             #sleep(0.01)
-        self.save(datalist, 
+        self.save(datalist,
                   os.path.join(self.processed_dir, 
-                               "data.pt"))
+                               self.proc_name))
         
     """
     def len(self):

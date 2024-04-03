@@ -22,7 +22,7 @@ import torch.nn.functional as F
 # raw node features are embedded into 2x dimensional embedding                         #
 # ------------------------------------------------------------------------------------ #
 class GATConvBlock(torch.nn.Module):
-    def __init__(self, dim_in: int, dim_h: int, dim_out: int, heads: int = 5):
+    def __init__(self, dim_in: int, dim_h: int, dim_out: int, heads: int = 2):
         super(GATConvBlock, self).__init__()
         
         self.gat1 = GATConv(dim_in, dim_h, heads=heads)
@@ -50,7 +50,7 @@ class GATConvBlock(torch.nn.Module):
 # ------------------------------------------------------------------------------------ #
 #                                    Edge model                                        #
 # Similar to ParticleNet Edge-Convolution. The modification is the concatenation of xi #
-# and xj instead if (xi -xj), xi. The steps are the following:                         #
+# and xj instead of (xi -xj), xi. The steps are the following:                         #
 # - build_mlp: a stack of lin layers with non-linear activation used at the edge conv  #
 # - EdgeConv_lrp: A Message Passing layer to demonstrate the behavior of operation     #
 # - EdgeConvBlock: MLP in edgeConv layer and then the conv layer to form nn module     #
@@ -115,7 +115,7 @@ class NuNet(torch.nn.Module):
     def __init__(self, 
                  node_feat_size,
                  global_feat_size,
-                 num_classes=6,
+                 num_classes,
                  depth=2,
                  dropout=False):
         super(NuNet, self).__init__()
@@ -126,9 +126,11 @@ class NuNet(torch.nn.Module):
 
         self.num_edge_conv_blocks = 2
         
-        self.kernel_sizes = [2*self.node_feat_size, 128, 256]
+        self.kernel_sizes = [2*self.node_feat_size, 128, 128]
+        #self.kernel_sizes = [2*self.node_feat_size, 32, 64]
         self.input_sizes = np.cumsum(self.kernel_sizes)
-        self.fc_size = 256
+        #self.fc_size = 256
+        self.fc_size = 128
 
         if dropout:
             self.dropout = 0.2
@@ -179,12 +181,13 @@ class NuNet(torch.nn.Module):
         
         return x
 
-
+'''
 def get_model_kwargs():
     return {
-        "node_feat_size": 22,
-        "global_feat_size": 11,
-        "num_classes": 6,
+        "node_feat_size": 11,
+        "global_feat_size": 4,
+        "num_classes": 1,
         "depth": 2,
         "dropout": True
     }
+'''

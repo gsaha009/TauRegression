@@ -17,16 +17,19 @@ class obj(object):
 
 
 class PlotUtil:
-    def __init__(self, events_record: ak.Record, outdir: str):
-        self.events_record = events_record
+    def __init__(self, 
+                 node_record: ak.Record, 
+                 target_record: ak.Record,
+                 global_record: ak.Record,
+                 outdir: str):
         self.outdir = outdir
-        #self.record_fields = events_record.fields
-        self.node_record = events_record["node_feats"]
-        self.target_record = events_record["target_feats"]
-        self.global_record = events_record["global_feats"]
+        self.node_record   = node_record
+        self.target_record = target_record
+        self.global_record = global_record
         
     def plot_nodes(self, size: tuple):
         node_feats = self.node_record.fields
+        print(f"node feats: {node_feats}")
         nrows = len(node_feats)
         ncols = ak.max(ak.num(self.node_record[node_feats[0]], axis=1))
         
@@ -52,8 +55,11 @@ class PlotUtil:
 
     def plot_targets(self, size: tuple):
         target_feats = self.target_record.fields
-        nrows = len(target_feats)
-        ncols = ak.max(ak.num(self.target_record[target_feats[0]], axis=1))
+        for field in target_feats:
+            print(f"{field} : \t{self.target_record[field]}")
+        print(f"target feats: {target_feats}")
+        nrows = 1#len(target_feats)
+        ncols = 1#ak.max(ak.num(self.target_record[target_feats[0]], axis=1))
         
         fig, ax = plt.subplots(nrows,ncols,figsize=(size[0],size[1]))
         #plt.subplots_adjust(left    = 0.1,
@@ -62,6 +68,8 @@ class PlotUtil:
         #                    bottom  = 0.1,
         #                    hspace  = 0.5,
         #                    wspace  = 0.4)
+
+        """
         for irow, feat in enumerate(target_feats):
             feat_arr = self.target_record[feat]
             #print(f"{feat}: {feat_arr}")
@@ -70,6 +78,15 @@ class PlotUtil:
                 #print(temp)
                 ax[irow,icol].hist(temp, bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{feat}_{icol+1}')
                 ax[irow,icol].legend()
+        """
+        ax.hist(self.target_record[target_feats[0]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[0]}')
+        #ax[0,1].hist(self.target_record[target_feats[1]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[1]}')
+        #ax[1,0].hist(self.target_record[target_feats[2]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[2]}')
+        #ax[1,1].hist(self.target_record[target_feats[3]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[3]}')
+        #ax[2,0].hist(self.target_record[target_feats[4]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[4]}')
+        #ax[2,1].hist(self.target_record[target_feats[5]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[5]}')
+        #ax[3,0].hist(self.target_record[target_feats[6]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[6]}')
+
 
         plt.tight_layout()
         plt.savefig(f"{self.outdir}/target_feats.png", dpi=350)
@@ -94,6 +111,54 @@ class PlotUtil:
         plt.tight_layout()
         plt.savefig(f"{self.outdir}/global_feats.png", dpi=350)
         #return plt
+
+def plothistory(history: dict, outdir: str) -> None:
+    x_left  = list(range(len(history.batch.loss)))
+    x_right = list(range(len(history.epoch.loss.train)))
+    # Create a figure and set of subplots
+    fig, axs = plt.subplots(3, 2, 
+                            figsize=(10, 8), 
+                            gridspec_kw={'width_ratios': [1, 1]}, 
+                            sharex="col")
+    
+    # Remove ticks and labels for the empty subplots
+    axs[0, 0].axis('off')
+    axs[2, 0].axis('off')
+
+    # Plot for the single plot on the left
+    axs[1, 0].plot(x_left, history.batch.loss)
+    axs[1, 0].set_xlabel('batches')
+    axs[1, 0].set_ylabel('Loss')
+    axs[1, 0].set_title('Loss per batch')
+
+    # Plot for the first subplot on the right
+    axs[0, 1].plot(x_right, history.epoch.loss.train, label="train")
+    axs[0, 1].plot(x_right, history.epoch.loss.val, label="val")
+    axs[0, 1].set_xlabel('epochs')
+    axs[0, 1].set_ylabel('Loss')
+    axs[0, 1].set_title('Loss per epoch')
+    axs[0, 1].legend()
+    
+    # Plot for the first subplot on the right
+    axs[1, 1].plot(x_right, history.epoch.accuracy.train, label="train")
+    axs[1, 1].plot(x_right, history.epoch.accuracy.val, label="val")
+    axs[1, 1].set_xlabel('epochs')
+    axs[1, 1].set_ylabel('Acc')
+    axs[1, 1].set_title('Acc per epoch (R2)')
+    axs[1, 1].legend()
+
+    # Plot for the first subplot on the right
+    axs[2, 1].plot(x_right, history.epoch.LR)
+    axs[2, 1].set_xlabel('epochs')
+    axs[2, 1].set_ylabel('LR')
+    axs[2, 1].set_title('LR per epoch')
+
+    # Share x-axis between columns
+    plt.subplots_adjust(hspace=0.4)
+    plt.tight_layout()
+
+    plt.savefig(f"{outdir}/train_out.png", dpi=350)
+
 
 def count_model_params(model):
     table = PrettyTable(["Modules", "Parameters"])
@@ -135,13 +200,15 @@ def plteval(y_true: torch.Tensor, y_pred: torch.Tensor, path: str) -> None:
     plt.figure(figsize=(20,12))
     ntargets = y_true.shape[-1]
     for i in range(ntargets):
-        ax = plt.subplot(int(ntargets/3),3,i+1)
+        ax = plt.subplot(int(ntargets/3),4,i+1)
         
         temp_true = y_true[:,i:i+1].cpu().numpy().reshape(-1)
         temp_pred = y_pred[:,i:i+1].cpu().numpy().reshape(-1)
         
-        ax.hist(temp_true, 100, range=[-50.0,50.0], histtype="stepfilled", alpha=0.7, label='True')
-        ax.hist(temp_pred, 100, range=[-50.0,50.0], histtype="stepfilled", alpha=0.7, label='Pred')
+        _range = [-50.0,50.0] if i < 6 else [0, 6.5]
+
+        ax.hist(temp_true, 100, range=_range, histtype="stepfilled", alpha=0.7, label='True')
+        ax.hist(temp_pred, 100, range=_range, histtype="stepfilled", alpha=0.7, label='Pred')
     #ax.set_title(f"{key}")
     #ax.set_xlabel(f'''{key.split('_')[-1]}''')
     ax.legend()

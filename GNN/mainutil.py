@@ -50,20 +50,30 @@ def load_config(filepath):
         config = yaml.safe_load(temp)
     return config
 
-# Plotting Graph
-def plot_nx_graph(dataset, outdir="", evt_idx=480):
-    pngname = f"nx_graph_{evt_idx}.png"
-    data=dataset[evt_idx].cpu()
-    nxg = to_networkx(data)
-    
-    pos = {i: (data.x[i, 1], data.x[i, 2]) for i in nxg.nodes}
-    
-    plt.figure(figsize=(6, 4))
-    ax = plt.axes()
-    nx.draw_networkx(nxg, pos, with_labels=True, arrows=True, node_size=10*data.x[:, 0], node_shape="o", ax=ax)
-    ax.tick_params(left=True, bottom=True, labelleft=True, labelbottom=True)
+# Plotting Graph#
+def plot_nx_graph(dataset, outdir):
+    import random
+    dsize = len(dataset)
+    idxs = random.sample(list(range(dsize)), 25)
+
+    # Create a canvas with a 10x10 grid of subplots
+    fig, axs = plt.subplots(5, 5, figsize=(15, 15))
+
+    _idx = 0
+    for i in range(5):
+        for j in range(5):
+            evt_idx = idxs[_idx]
+            data=dataset[evt_idx].cpu()
+            nxg = to_networkx(data)
+            pos = {i: (data.x[i, 1], data.x[i, 2]) for i in nxg.nodes}
+            ax  = axs[i,j]
+            nx.draw_networkx(nxg, pos, with_labels=True, arrows=False, node_size=5*data.x[:, 0], node_shape="o", ax=ax)
+            ax.tick_params(left=True, bottom=True, labelleft=True, labelbottom=True)
+            ax.set_title(f"event {evt_idx}")
+            _idx += 1
+
     plt.tight_layout()
-    plt.savefig(os.path.join(outdir, pngname), dpi=300)
+    plt.savefig(os.path.join(outdir, "nx_graph.png"), dpi=300)
 
 
 # For DDP: Each process control a single gpu

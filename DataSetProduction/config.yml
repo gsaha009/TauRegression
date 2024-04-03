@@ -3,7 +3,7 @@
 indir:
   #- /Volumes/WorkExtHDD/DY_NanoAOD_v10/DYJetsToLL_M-50-madgraphMLM
   #- /Volumes/WorkExtHDD/DY_NanoAOD_v10/DYJetsToLL_M-50-madgraphMLM_ext1
-  - Input/GluGluHToTauTau_M125
+  - /sps/cms/gsaha/GluGluHToTauTau_M125
   
 catstokeep:
   - event

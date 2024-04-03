@@ -19,8 +19,8 @@ from coffea.nanoevents.methods import vector
 from tqdm.notebook import tqdm
 import itertools
 from typing import Optional
-#import torch
-#from torch_geometric.loader import DataLoader
+from PhiCPComp import PhiCPComp
+
 
 
 def invariant_mass(events: ak.Array) -> ak.Array:
@@ -85,6 +85,7 @@ def tau_selection(events: ak.Array, ele_idxs=None, mu_idxs=None) -> ak.Array:
         (taus.pt > 20)
         & (abs(taus.eta) < 2.3)
         & (abs(taus.dz) < 0.2)
+        & ((taus.charge == 1) | (taus.charge == -1))
         & (taus.idDecayModeNewDMs)
         & ((taus.decayMode == 0)
            | (taus.decayMode == 1)
@@ -127,6 +128,117 @@ def jet_selection(events: ak.Array, ele_idxs=None, mu_idxs=None, tau_idxs=None) 
     #print("jets selected")
     return sel_jet_indices
 
+
+def gentauandprods_selection(events: ak.Array):
+    # masks to select gen tau+ and tau-
+    is_taum = ((events.GenPart.pdgId == 15) 
+               & (events.GenPart.hasFlags(["isPrompt","isLastCopy"]))
+               & (events.GenPart.status == 2)
+               & (events.GenPart.pt >= 10)
+               & (np.abs(events.GenPart.eta) <= 2.3))
+    is_taup = ((events.GenPart.pdgId == -15) 
+               & (events.GenPart.hasFlags(["isPrompt","isLastCopy"])) 
+               & (events.GenPart.status == 2)
+               & (events.GenPart.pt >= 10)
+               & (np.abs(events.GenPart.eta) <= 2.3))
+    
+    # get gen tau+ and tau- objects from events GenParts
+    taum = events.GenPart[is_taum]
+    taup = events.GenPart[is_taup]
+
+    # make sure event has at least one tau+ and tau-
+    has_taum = ak.sum(is_taum, axis=1) > 0
+    has_taup = ak.sum(is_taup, axis=1) > 0
+    evt_mask_1 = has_taum & has_taup
+    
+    events = events[evt_mask_1]
+    taum = taum[evt_mask_1]
+    taup = taup[evt_mask_1]
+        
+    taum_momidx    = taum.distinctParent.genPartIdxMother
+    #taum_mom       = events.GenPart[taum_momidx]
+    is_taum_from_h = (events.GenPart[taum_momidx].pdgId == 25) & (events.GenPart[taum_momidx].status == 22)
+    # get tau- mother indices
+    taum_momidx = taum_momidx[is_taum_from_h]
+    #taum_mom    = events.GenPart[taum_momidx]
+
+    taup_momidx = taup.distinctParent.genPartIdxMother
+    #taup_mom    = events.GenPart[taup_momidx]
+    is_taup_from_h = (events.GenPart[taup_momidx].pdgId == 25) & (events.GenPart[taup_momidx].status == 22)
+    # get tau+ mother indices
+    taup_momidx = taup_momidx[is_taup_from_h]
+    #taup_mom    = events.GenPart[taup_momidx]
+
+    has_taum_from_h = ak.sum(is_taum_from_h, axis=1) > 0
+    has_taup_from_h = ak.sum(is_taup_from_h, axis=1) > 0
+
+    evt_mask_2 = has_taum_from_h & has_taup_from_h
+    events = events[evt_mask_2]
+    taum = taum[evt_mask_2]
+    taup = taup[evt_mask_2]
+    taum_momidx = taum_momidx[evt_mask_2]
+    taup_momidx = taup_momidx[evt_mask_2]
+
+
+    # get tau products
+    taum_children = ak.firsts(taum.distinctChildren)
+    taup_children = ak.firsts(taup.distinctChildren)
+
+    evt_mask_3 = (ak.num(taum_children.pdgId, axis=1) > 0) & (ak.num(taup_children.pdgId, axis=1) > 0)
+    events = events[evt_mask_3]
+    taum = taum[evt_mask_3]
+    taup = taup[evt_mask_3]
+    taum_momidx = taum_momidx[evt_mask_3]
+    taup_momidx = taup_momidx[evt_mask_3]
+    taum_children = taum_children[evt_mask_3]
+    taup_children = taup_children[evt_mask_3]
+
+
+    #event_level_mask = ((ak.num(taum_momidx, axis=1)   == 1) 
+    #                    & (ak.num(taup_momidx, axis=1) == 1)
+    #                    & (ak.num(taum.pdgId, axis=1)  == 1)
+    #                    & (ak.num(taup.pdgId, axis=1)  == 1)
+    #                    & (ak.num(taum_children.pdgId, axis=1) > 0)
+    #                    & (ak.num(taup_children.pdgId, axis=1) > 0))
+
+    #events = events[event_level_mask]
+    #taum = taum[event_level_mask]
+    #taup = taup[event_level_mask]
+    #taum_momidx = taum_momidx[event_level_mask]
+    #taup_momidx = taup_momidx[event_level_mask]
+
+    #same_mom = taum_momidx == taup_momidx
+    #evt_level_mask4 = ak.sum(same_mom, axis=1) == 1
+    evt_level_mask4 = ((ak.num(taum.pdgId, axis=1) == 1) 
+                       & (ak.num(taup.pdgId, axis=1) == 1)
+                       & (ak.num(taum_momidx, axis=1) == 1)
+                       & (ak.num(taup_momidx, axis=1) == 1))
+
+    events = events[evt_level_mask4]
+    taum = taum[evt_level_mask4]
+    taup = taup[evt_level_mask4]
+    taum_children = taum_children[evt_level_mask4]
+    taup_children = taup_children[evt_level_mask4]
+
+    #from IPython import embed; embed()
+
+
+    #taum = taum[same_mom]
+    #taup = taup[same_mom]
+    #taum_children = ak.firsts(taum.distinctChildren)
+    #taup_children = ak.firsts(taup.distinctChildren)
+
+    #event_level_mask2 = ak.sum(same_mom, axis=1) == 1
+
+    #events = events[event_level_mask2]
+    #taum = taum[event_level_mask2]
+    #taup = taup[event_level_mask2]
+    #taum_children = taum_children[event_level_mask2]
+    #taup_children = taup_children[event_level_mask2]
+
+
+    return events, taum, taup, taum_children, taup_children
+    
 
 
 def gentaunu_selection(events: ak.Array, tau_idxs=None) -> ak.Array:
@@ -224,6 +336,7 @@ def getP4(arr: ak.Array) -> ak.Array:
 # ----------------------------------------------------------------------------------------------------- #
 def tonumpy(arr, maxidx, iscat, isnorm, feat, tag):
     keylist = []
+    _uniques = {"charge": [-1., 1.], "decayMode": [0.,1.,10.,11.], "decayModePNet": [-1.,0.,1.,2.,10.,11.]}
     nptemp = None
     for idx in range(maxidx):
         #key = f"{tag}_{idx+1}"
@@ -235,7 +348,9 @@ def tonumpy(arr, maxidx, iscat, isnorm, feat, tag):
             print("categorical ---> ")
             npones  = np.ones_like(temp)
             npzeros = np.zeros_like(temp)
-            uniques = np.unique(temp)
+            #uniques = np.unique(temp)
+            uniques = np.array(_uniques[feat])
+            print(f"\tuniques: {uniques}")
             catarray = None
             for i, val in enumerate(uniques):
                 #_key = f"{tag}_{val}_{idx+1}"
@@ -243,7 +358,7 @@ def tonumpy(arr, maxidx, iscat, isnorm, feat, tag):
                 print(f"\t{_key}")
                 keylist.append(_key)
                 tempcatarray = np.where(temp == val, npones, npzeros)[:,None]
-                print(f"\t{tempcatarray}")
+                #print(f"\t{tempcatarray}")
                 if i == 0:
                     catarray = tempcatarray
                 else:
@@ -256,7 +371,7 @@ def tonumpy(arr, maxidx, iscat, isnorm, feat, tag):
             temp = temp[:,None]
             keylist.append(key)
 
-        print(temp)
+        #print(temp)
         if idx == 0:
             nptemp = temp
         else:
@@ -300,6 +415,8 @@ def getnodes(objs, featlist, maxidx, tag, isnorm):
     #feats = np.concatenate((node_feat_tau, node_feat_jet), axis=1)
 
     keys, feats = get_feats_per_obj(objs, featlist, maxidx, tag, isnorm)
+    print(f"Total node feats: {len(keys)}")
+    print(f"Node feat shape: {feats.shape}")
 
     return feats, keys
 
@@ -356,6 +473,10 @@ def getmanuals(taus, tau1prods, tau2prods, met, isnorm):
     #print(np.std(concat_array, axis=0))
     if isnorm:
         concat_array = (concat_array - np.mean(concat_array, axis=0))/np.std(concat_array, axis=0)
+
+    print(f"Total manual feats: {len(key_list)}")
+    print(f"Node manual shape: {concat_array.shape}")
+
     return concat_array, key_list
 
 
@@ -415,6 +536,8 @@ def getglobals(vardict, isnorm):
 
     #data  = pd.DataFrame(global_np, columns=global_feats)
     #return data
+    print(f"Total global feats: {len(global_feats)}")
+    print(f"Global feat shape: {global_np.shape}")
     return global_np, global_feats
 
 
@@ -443,19 +566,43 @@ def gettargets(gentaus, gentaunus):
                    "px_gentaunu_1", "py_gentaunu_1", "pz_gentaunu_1", 
                    "px_gentaunu_2", "py_gentaunu_2", "pz_gentaunu_2"]
 
+    print(f"Total target feats: {len(target_keys)}")
+    print(f"Target feat shape: {np_target_feats.shape}")
+
     return np_target_feats, target_keys
+
+
+def findDecayMode(Nc, Np): 
+    return 5 * (Nc - 1) + Np
+
+
+def genDM(prod: ak.Array):
+    pids = prod.pdgId
+    is_charged = ((np.abs(pids) == 211) 
+                  | (np.abs(pids) == 321))
+    is_neutral = ((pids == 111) | (pids == 311))
+    
+    Nc = ak.sum(is_charged, axis=-1)
+    Np = ak.sum(is_neutral, axis=-1)
+
+    dm = findDecayMode(Nc, Np)
+    
+    return dm
+
 
 # ----------------------------------------------------------------------------------------------------- #
 #                                            main script                                                #
 # ----------------------------------------------------------------------------------------------------- #
-def get_events_dict(events:ak.Array, norm: bool):
+def get_events_dict(_events:ak.Array, norm: bool, dm: str):
+    print(f"Decay Mode: {dm}")
+    events, taum, taup, taum_children, taup_children = gentauandprods_selection(_events)
 
     muo_sel_idx = muon_selection(events)
     ele_sel_idx = electron_selection(events, mu_idxs=muo_sel_idx)
     tau_sel_idx = tau_selection(events, ele_idxs=ele_sel_idx, mu_idxs=muo_sel_idx)
     jet_sel_idx = jet_selection(events, ele_idxs=ele_sel_idx, mu_idxs=muo_sel_idx, tau_idxs=tau_sel_idx)
-    gentaunu_sel_idx = gentaunu_selection(events, tau_idxs=tau_sel_idx)
-    gentau_sel_idx = gentau_selection(events, tau_idxs=tau_sel_idx)
+    #gentaunu_sel_idx = gentaunu_selection(events, tau_idxs=tau_sel_idx)
+    #gentau_sel_idx = gentau_selection(events, tau_idxs=tau_sel_idx)
 
     #print(tau_sel_idx)
         
@@ -463,50 +610,63 @@ def get_events_dict(events:ak.Array, norm: bool):
         (ak.num(tau_sel_idx, axis=1) == 2)
         & (ak.num(ele_sel_idx, axis=1) == 0)
         & (ak.num(muo_sel_idx, axis=1) == 0)
+        & (ak.num(taum, axis=1) == 1)
+        & (ak.num(taup, axis=1) == 1)
+        & (ak.num(taum_children, axis=1) > 0)
+        & (ak.num(taup_children, axis=1) > 0)
     )
 
-    is_os = ak.sum(events.Tau[tau_sel_idx].charge, axis=-1) == 0
-    #print(f"is_os: {is_os}")
-    has_two_gentaunu = ak.num(gentaunu_sel_idx, axis=-1) >= 2
-    has_two_gentau   = ak.num(gentau_sel_idx, axis=-1) >= 2
-    invmass = invariant_mass(events.Tau[tau_sel_idx])
-    #print(f"invmass: {invmass}")
-    isZ = (invmass > 12) & (invmass < 200)
-    #print(f"isZ: {isZ}")
+    is_os = ak.sum(events.Tau[tau_sel_idx].charge, axis=1) == 0
+    #has_two_gentaunu = ak.num(gentaunu_sel_idx, axis=-1) >= 2
+    #has_two_gentau   = ak.num(gentau_sel_idx, axis=-1) >= 2
+    
+    where = is_tauhtauh & is_os
+
     #from IPython import embed; embed()
     
-    false_mask = (abs(events.event) < 0)
-    #channel_id = np.uint8(1) * false_mask
-    empty_indices = ak.zeros_like(events.event, dtype=np.uint16)[..., None][..., :0]
-    #empty_indices = ak.zeros_like(events.event, dtype=np.uint16)[:,None]
-    #empty_indices = ak.drop_none(ak.mask(empty_indices, empty_indices > 0))
-    print(f"empty_indices: {empty_indices}")
-    #empty_indices = ak.zeros_like(1 * events.event, dtype=np.uint16)[..., None][..., :0]
+    events = events[where]
+    tau_sel_idx = tau_sel_idx[where]
+    jet_sel_idx = jet_sel_idx[where]
+    #gentaunu_sel_idx = ak.where(where, gentaunu_sel_idx, empty_indices)
+    #gentau_sel_idx = ak.where(where, gentau_sel_idx, empty_indices)
     
-    where = is_tauhtauh & is_os & has_two_gentaunu & has_two_gentau & isZ
-
-    #print(f"is_tauhtauh: {ak.sum(is_tauhtauh)}")
-    #print(f"is_tauhtauh & is_os: {ak.sum(is_tauhtauh & is_os)}")
-    #print(f"is_tauhtauh & is_os & has_two_gentau: {ak.sum(is_tauhtauh & is_os & has_two_gentau)}")
-    #print(f"is_tauhtauh & is_os & has_two_gentau & isZ: {ak.sum(is_tauhtauh & is_os & has_two_gentau & isZ)}")
-
-    
-    muo_sel_idx = ak.where(where, muo_sel_idx, empty_indices)
-    ele_sel_idx = ak.where(where, ele_sel_idx, empty_indices)
-    tau_sel_idx = ak.where(where, tau_sel_idx, empty_indices)
-    jet_sel_idx = ak.where(where, jet_sel_idx, empty_indices)
-    gentaunu_sel_idx = ak.where(where, gentaunu_sel_idx, empty_indices)
-    gentau_sel_idx = ak.where(where, gentau_sel_idx, empty_indices)
-    
-    muons = events.Muon[muo_sel_idx]
-    electrons = events.Electron[ele_sel_idx]
     jets = events.Jet[jet_sel_idx]
     taus = events.Tau[tau_sel_idx]
-    gentaunus = events.GenPart[gentaunu_sel_idx]
-    gentaus = events.GenPart[gentau_sel_idx]
+    #gentaunus = events.GenPart[gentaunu_sel_idx]
+    #gentaus = events.GenPart[gentau_sel_idx]
     tauprods = events.TauProd
-    
+    # gentaus
+    gentaum = taum[where]
+    gentaup = taup[where]
+    gentaum_decay = taum_children[where]
+    gentaup_decay = taup_children[where]
 
+    gentaus = ak.concatenate([gentaum, gentaup], axis=1)
+
+
+    _taus = gentaus.nearest(taus, threshold=0.4)
+
+    mask = (ak.num(_taus, axis=1) == 2) & (ak.sum(taus.charge, axis=1) == 0)
+
+    events = events[mask]
+    taus = taus[mask]
+    tauprods = tauprods[mask]
+    jets = jets[mask]
+    gentaum = gentaum[mask]
+    gentaup = gentaup[mask]
+    gentaum_decay = gentaum_decay[mask]
+    gentaup_decay = gentaup_decay[mask]
+
+    gentaum_decay_nu = gentaum_decay[np.abs(gentaum_decay.pdgId) == 16]
+    gentaup_decay_nu = gentaup_decay[np.abs(gentaup_decay.pdgId) == 16]
+    
+    gentaunus = ak.concatenate([gentaum_decay_nu, gentaup_decay_nu], axis=1)
+
+
+    assert ak.min(ak.num(gentaunus.pdgId, axis=1)) == 2
+
+    gentaus     = ak.concatenate([gentaum, gentaup], axis=1)
+    gentauprods = ak.concatenate([gentaum_decay[:,None], gentaup_decay[:,None]], axis=1)
     #print(f"Fields: {gentaunus.fields}, {gentaus.fields}")
     #print(f"Gen_nu mass: {ak.max(gentaunus.mass)}")
     #print(f"Gen_tau mass: {ak.max(gentaus.mass)}")
@@ -522,25 +682,9 @@ def get_events_dict(events:ak.Array, norm: bool):
     gentaus["pz"] = gentaus.pz
     #gentaus["energy"] = gentaus.E
     #gentaus["mass"] = (1 * gentaus).mass
+    gentaus["DM"] = genDM(gentauprods)
+
     
-    # event and object masks applied
-    events = events[where]
-
-    #print(f"met: {events.MET.pt}")
-
-    # indices
-    muo_sel_idx = muo_sel_idx[where]
-    ele_sel_idx = ele_sel_idx[where]
-    tau_sel_idx = tau_sel_idx[where]
-    jet_sel_idx = jet_sel_idx[where]
-    gentaunu_sel_idx = gentaunu_sel_idx[where]
-    gentau_sel_idx = gentau_sel_idx[where]
-    # objects
-    muons = muons[where]
-    electrons = electrons[where]
-    jets = jets[where]
-    taus = taus[where]
-    tauprods = tauprods[where]
     # get tau prods for taus
     tau1_idx = tau_sel_idx[:,:1]
     tau1_idx_brdcst, tauprod_tauIdx = ak.broadcast_arrays(ak.firsts(tau1_idx,axis=1), tauprods.tauIdx)
@@ -554,16 +698,93 @@ def get_events_dict(events:ak.Array, norm: bool):
     #print(tau1_prods.tauIdx)
     #print(tau2_prods.tauIdx)
     tauprods_concat = ak.concatenate([tau1prods[:,None], tau2prods[:,None]], axis=1)
+    """
+    final_is_os = ak.sum(taus.charge, axis=1) == 0
+    events      = events[final_is_os] 
+    taus        = taus[final_is_os]
+    tau1prods   = tau1prods[final_is_os]
+    tau2prods   = tau2prods[final_is_os] 
+    tauprods_concat = ak.concatenate([tau1prods[:,None], tau2prods[:,None]], axis=1)
+    jets        = jets[final_is_os] 
+    gentaus     = gentaus[final_is_os]
+    gentaunus   = gentaunus[final_is_os]
+    gentauprods = gentauprods[final_is_os]
+    """
+    # --------------------------------------------------------------- #
+    # Events has two gen taus and detector level taus
+    # calculate from gen-level only:
+    # -- get decay modes from gen - level
+    # -- compare with reconstructed level DM
+    print(f"charge: {ak.to_list(taus.charge)}")
 
-    gentaunus = taus.nearest(gentaunus[where], threshold=0.4)
-    gentaus = taus.nearest(gentaus[where], threshold=0.4)
+    print(f"taus pt      : {taus.pt}")
+    print(f"gentaus pt   : {gentaus.pt}")
+    print(f"tau prods    : {tauprods_concat.pdgId}")
+    print(f"gentau prods : {gentauprods.pdgId}")
+    print(f"gentau DM    : {gentaus.DM}")
 
 
-    #print(f"tau_sel_idx: {tau_sel_idx}")
-    #print(f"tauprods: {tauprods.tauIdx}")
-    #print(f"tau1prods: {tau1prods.tauIdx}")
-    #print(f"tau2prods: {tau2prods.tauIdx}")
-    #print(f"tauprods_concat: {tauprods_concat.tauIdx}")
+    # ----------
+    # zero prong only
+    # ----------
+    mask = events.event >= 0
+    catstr = ""
+    if dm == "00":
+        zero_prong = (gentaus.DM == 0)
+        mask = ak.sum(zero_prong, axis=1) == 2
+        catstr = "pipi"
+    elif dm == "10":
+        one_zero_prong = (((gentaus.DM[:,:1] == 0) & (gentaus.DM[:,1:2] == 1)) 
+                          | ((gentaus.DM[:,:1] == 1) & (gentaus.DM[:,1:2] == 0)))
+        mask = ak.sum(one_zero_prong, axis=1) == 2
+        catstr = "pirho"
+    elif dm == "11":
+        one_prong = (gentaus.DM == 1)
+        mask = ak.sum(one_prong, axis=1) == 2
+        catstr = "rhorho"
+    else:
+        print("WARNING: inclusive DM")
+    
+    events      = events[mask] 
+    taus        = taus[mask]
+    tau1prods   = tau1prods[mask]
+    tau2prods   = tau2prods[mask] 
+    tauprods_concat = ak.concatenate([tau1prods[:,None], tau2prods[:,None]], axis=1)
+    jets        = jets[mask] 
+    gentaus     = gentaus[mask]
+    gentaunus   = gentaunus[mask]
+    gentauprods = gentauprods[mask]
+    
+
+    #from IPython import embed; embed()
+
+    phi_cp = -99 * ak.ones_like(events.event)[:,None]
+    hasdm = (dm == "00") | (dm == "10") | (dm == "11")
+    if hasdm:
+        phicp_obj = PhiCPComp(cat=catstr,
+                              taum=gentaus[:,0:1],
+                              taup=gentaus[:,1:2],
+                              taum_decay=gentauprods[:,0:1],
+                              taup_decay=gentauprods[:,1:2])
+        phi_cp = phicp_obj.comp_phiCP()
+        phi_cp = ak.firsts(phi_cp, axis=1)
+
+    #from IPython import embed; embed()
+    """
+    mask = ak.fill_none(ak.num(phi_cp, axis=1),0) == 1
+    
+    events      = events[mask] 
+    taus        = taus[mask]
+    tau1prods   = tau1prods[mask]
+    tau2prods   = tau2prods[mask] 
+    tauprods_concat = ak.concatenate([tau1prods[:,None], tau2prods[:,None]], axis=1)
+    jets        = jets[mask] 
+    gentaus     = gentaus[mask]
+    gentaunus   = gentaunus[mask]
+    gentauprods = gentauprods[mask]
+    phi_cp      = phi_cp[mask]
+    """
+    #from IPython import embed; embed()
 
     np_manual_node_feats, manual_node_keys = getmanuals(taus, tau1prods, tau2prods, events.MET, norm)
     tau_feats = ["pt", "ptCorrPNet", "eta", "phi", "mass", "dxy", "dz", 
@@ -579,14 +800,24 @@ def get_events_dict(events:ak.Array, norm: bool):
     np_global_feats, global_keys = getglobals(global_var_to_keep(events, taus), norm)
 
     np_target_feats, target_keys = gettargets(gentaus, gentaunus)
+    #np_target_feats = np.concatenate((np_target_feats, phi_cp), axis=1)
+    #target_keys = target_keys + ["phicp"]
+    #from IPython import embed; embed()
+    extra_feats = ak.to_numpy(phi_cp)
+    extra_keys = ["phicp"]
+
+    #from IPython import embed; embed()
 
     all_feats = np.concatenate((np_tau_node_feats, 
                                 np_jet_node_feats, 
                                 np_manual_node_feats, 
                                 np_global_feats, 
-                                np_target_feats), axis=1)
-    all_keys  = tau_node_keys + jet_node_keys + manual_node_keys + global_keys + target_keys
+                                np_target_feats,
+                                extra_feats), axis=1)
+    all_keys  = tau_node_keys + jet_node_keys + manual_node_keys + global_keys + target_keys + extra_keys
 
+    print(f" ---> feat shape: \n\t{np_tau_node_feats.shape}\n\t{np_jet_node_feats.shape}\n\t{np_manual_node_feats.shape}\n\t{np_global_feats.shape}\n\t{np_target_feats.shape}\n\t{extra_feats.shape}\n\t{all_feats.shape}")
+    print(f" ---> nfeats    : \n\t{len(tau_node_keys)}\n\t{len(jet_node_keys)}\n\t{len(manual_node_keys)}\n\t{len(global_keys)}\n\t{len(target_keys)}\n\t{len(extra_keys)}\n\t{len(all_keys)}")
     #data  = pd.DataFrame(all_feats, columns=all_keys) 
     #print(list(data.keys()))
     #print(data.head(10))
@@ -616,6 +847,13 @@ def main():
                         required=False,
                         default="Temp",
                         help="Make a dir with a tag to save the parquets with node, target and graph level features")
+    parser.add_argument('-DM',
+                        '--DecayMode',
+                        type=str,
+                        required=False,
+                        default="",
+                        help="Make a dir with a tag to save the parquets with node, target and graph level features")
+
     args = parser.parse_args()
 
     outdir = f"{args.tag}_{datetime_tag}" if not args.normalise else f"{args.tag}_norm_{datetime_tag}"
@@ -646,21 +884,24 @@ def main():
         events = NanoEventsFactory.from_root(fname).events()
         print(f"nEvents: {ak.num(events.event, axis=0)}")
         print(f"Event Fields: {events.fields}")
-        events_feats, events_keys = get_events_dict(events, args.normalise)
+        events_feats, events_keys = get_events_dict(events, args.normalise, args.DecayMode)
         #events_df = get_events_dict(events, args.normalise)
         if index == 0:
+            #from IPython import embed; embed()
             main_np = events_feats
         else:
+            #from IPython import embed; embed()
             #main_df = pd.concat([main_df, events_df])
             main_np = np.concatenate((main_np, events_feats), axis=0)
 
+    #from IPython import embed; embed()
     print(main_np.shape)
     main_df = pd.DataFrame(main_np, columns=events_keys) 
     print(list(main_df.keys()))
     print(main_df.head())
 
     print(f"nEntries: {main_df.shape}")
-    h5name = 'GluGluHToTauTauSMdata_norm.h5' if args.normalise else 'GluGluHToTauTauSMdata.h5'
+    h5name = f'GluGluHToTauTauSMdata_norm_{args.DecayMode}.h5' if args.normalise else f'GluGluHToTauTauSMdata_{args.DecayMode}.h5'
     main_df.to_hdf(h5name, key='df', mode='w')
     #return outdir, main_df
 

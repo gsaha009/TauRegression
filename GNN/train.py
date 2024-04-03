@@ -11,6 +11,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torchmetrics
 from tqdm import tqdm
+from util import obj
 
 
 class Trainer:
@@ -32,7 +33,7 @@ class Trainer:
         self.trainloader = trainloader
         self.valloader = valloader
         self.testloader = testloader
-        self.criterion = nn.MSELoss() #nn.HuberLoss()  #nn.MSELoss()  # #nn.L1Loss()
+        self.criterion = nn.HuberLoss() #nn.MSELoss()  #nn.MSELoss()  # #nn.L1Loss()
         self.doval = dovalidate
 
         # Optimiser
@@ -67,6 +68,7 @@ class Trainer:
             multioutput="uniform_average", #"variance_weighted" # "raw_values"
         ).to(self.gpu_id)
 
+
     def _run_batch(self, src: torch.Tensor, tgt: torch.Tensor) -> float:
         self.optimizer.zero_grad()
 
@@ -77,20 +79,24 @@ class Trainer:
         self.optimizer.step()
         
         self.train_acc.update(out, tgt)
+        #print(loss, loss.item())
         return loss.item()
 
     def _run_epoch(self, epoch: int) -> None:
+        batch_losses = []
         train_loss = 0.0
         val_loss = 0.0
         val_acc = 0.0
+        nbatch = len(self.trainloader)
         start = float(time.time())
-        for ibatch in tqdm(range(len(self.trainloader)), ascii=True):
+        for ibatch in tqdm(range(nbatch), ascii=True):
             #print(f"Batch: {ibatch}")
             data_batched = next(iter(self.trainloader))
             src = data_batched.to(self.gpu_id)
             tgt = data_batched.y.to(self.gpu_id)
             #print(src.get_device(), tgt.get_device())
             loss_batch = self._run_batch(src, tgt)
+            batch_losses.append(loss_batch)
             #print(loss_batch.get_device())
             train_loss += loss_batch
             
@@ -100,45 +106,29 @@ class Trainer:
                     src = data_batched.to(self.gpu_id)
                     tgt = data_batched.y.to(self.gpu_id)
                     out = self.model(src)
-                    loss_batch = self.criterion(out, tgt)
+                    loss_batch = self.criterion(out, tgt).item()
                     val_loss += loss_batch
                     self.valid_acc.update(out, tgt)
                 
-        val_acc = self.valid_acc.compute().item()
+        train_loss = train_loss/nbatch
+        train_acc  = self.train_acc.compute().item()
+        val_loss   = val_loss / len(self.valloader)
+        val_acc    = self.valid_acc.compute().item()
+        LRate      = self.optimizer.param_groups[0]['lr']
         self.lr_scheduler.step(train_loss)
-
-        """
-        for i, data_batched in enumerate(self.trainloader):
-            print(f"Batch: {i}")
-            src = data_batched.to(self.gpu_id)
-            tgt = data_batched.y.to(self.gpu_id)
-            #print(src.get_device(), tgt.get_device())
-            loss_batch = self._run_batch(src, tgt)
-            #print(loss_batch.get_device())
-            train_loss += loss_batch
-
-        if validation:
-            with torch.no_grad():
-                for data_batched in self.valloader:
-                    src = data_batched.to(self.gpu_id)
-                    tgt = data_batched.y.to(self.gpu_id)
-                    out = self.model(src)
-                    loss_batch = self.criterion(out, tgt)
-                    val_loss += loss_batch
-                    self.valid_acc.update(out, tgt)
-                val_acc = self.valid_acc.compute().item()
-        """
-
+        
         end = float(time.time())
         print(
-            f"\n[GPU{self.gpu_id}] Epoch {epoch:2d} | Batchsize: {self.h_params.batchlen} | Steps: {len(self.trainloader)} | LR: {self.optimizer.param_groups[0]['lr']:.4f} | Loss: {train_loss / len(self.trainloader):.4f} | R2: {self.train_acc.compute().item():.2f} | Val-Loss: {val_loss / len(self.valloader):.4f} | Val-R2: {val_acc:.2f} | time: {round((end - start)/60,3)} min",
+            f"\n[GPU{self.gpu_id}] Epoch {epoch:2d} | Batchsize: {self.h_params.batchlen} | Steps: {len(self.trainloader)} | LR: {LRate:.4f} | Loss: {train_loss:.4f} | R2: {train_acc:.2f} | Val-Loss: {val_loss:.4f} | Val-R2: {val_acc:.2f} | time: {round((end - start)/60,4)} min",
             flush=True,
         )
 
         self.train_acc.reset()
         if self.doval: 
             self.valid_acc.reset()
-        
+
+        return batch_losses, train_loss, train_acc, val_loss, val_acc, LRate
+
 
     def _save_checkpoint(self, epoch: int):
         ckp = self.model.state_dict()
@@ -147,13 +137,42 @@ class Trainer:
 
         
     def train(self):
+        list_batch_loss = []
+        list_train_loss = []
+        list_val_loss   = []
+        list_train_acc  = []
+        list_val_acc    = []
+        list_LRate      = []
         self.model.train()
         for epoch in range(self.h_params.nepochs):
-            self._run_epoch(epoch)
+            batch_losses, train_loss, train_acc, val_loss, val_acc, LRate = self._run_epoch(epoch)
+            list_batch_loss += batch_losses
+            list_train_loss.append(train_loss)
+            list_train_acc.append(train_acc)
+            list_val_loss.append(val_loss)
+            list_val_acc.append(val_acc)
+            list_LRate.append(LRate)
             if epoch % self.h_params.save_every == 0:
                 self._save_checkpoint(epoch)
         # save last epoch
         self._save_checkpoint(self.h_params.nepochs - 1)
+        history = {
+            "batch": {
+                "loss": list_batch_loss,
+            },
+            "epoch": {
+                "loss": {
+                    "train": list_train_loss,
+                    "val"  : list_val_loss,
+                },
+                "accuracy": {
+                    "train": list_train_acc,
+                    "val"  : list_val_acc,
+                },
+                "LR": list_LRate,
+            },
+        }
+        return history
 
         
     def test(self, final_model_path: str):
