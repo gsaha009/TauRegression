@@ -40,6 +40,7 @@ class PhiCPBase:
         #taum_decay = ak.where(mask, self.taum_decay, empty)
         #taup_decay = ak.where(mask, self.taup_decay, empty)
         #return self.taum[mask], self.taup[mask], self.taum_decay[mask], self.taup_decay[mask]
+        print(self.taum.fields)
         return self.taum, self.taup, self.taum_decay, self.taup_decay
         #return taum, taup, taum_decay, taup_decay
 
@@ -387,90 +388,65 @@ class PhiCPBase:
         
         print(" --- taum ===>")
         p4_taum = getp4(taum, verbose=False)
-        #p4_taum = setp4("PtEtaPhiMLorentzVector",
-        #                p4_taum.pt,
-        #                p4_taum.eta,
-        #                p4_taum.phi,
-        #                1.777+p4_taum.mass,
-        #                p4_taum.pdgId,
-        #                verbose=False)
+        p4_taum = setp4("PtEtaPhiMLorentzVector",
+                        p4_taum.pt,
+                        p4_taum.eta,
+                        p4_taum.phi,
+                        1.777+p4_taum.mass,
+                        p4_taum.pdgId,
+                        verbose=False)
         print(" --- taup ===>")
         p4_taup = getp4(taup, verbose=False)
-        #p4_taup = setp4("PtEtaPhiMLorentzVector",
-        #                p4_taup.pt,
-        #                p4_taup.eta,
-        #                p4_taup.phi,
-        #                1.777+p4_taup.mass,
-        #                p4_taup.pdgId,
-        #                verbose=False)
+        p4_taup = setp4("PtEtaPhiMLorentzVector",
+                        p4_taup.pt,
+                        p4_taup.eta,
+                        p4_taup.phi,
+                        1.777+p4_taup.mass,
+                        p4_taup.pdgId,
+                        verbose=False)
 
         # tau- pi+
         print(" --- taum_os_pi (pi+) ===>")
-        p4_taum_os_pi = getp4(taum_decay[taum_decay.pdgId == 211],
-                              verbose=False)
-        #p4_taum_os_pi = setp4("PtEtaPhiMLorentzVector",
-        #                      p4_taum_os_pi.pt,
-        #                      p4_taum_os_pi.eta,
-        #                      p4_taum_os_pi.phi,
-        #                      0.1396*ak.ones_like(p4_taum_os_pi.pt),
-        #                      p4_taum_os_pi.pdgId,
-        #                      verbose=False)
-        # tau- pi-s
-        p4_taum_ss_pi = getp4(taum_decay[taum_decay.pdgId == -211])
+        mask_charge_1 = lambda dtr: ((dtr.pdgId == 211) | (dtr.pdgId == 321))
+        mask_charge_2 = lambda dtr: ((dtr.pdgId == -211) | (dtr.pdgId == -321))
+        #print(f"taum charge: {taum.charge}")
+        print(f"taum mass: {taum.mass}")
+        is_os = lambda mom, dtr: ak.where(mom.pdgId == 15, mask_charge_1(dtr), mask_charge_2(dtr))
+        print(f"is_os: {is_os}")
+        is_ss = lambda mom, dtr: ak.where(mom.pdgId == 15, mask_charge_2(dtr), mask_charge_1(dtr))
+        print(f"is_ss: {is_ss}")
+        p4_taum_os_pi = getp4(taum_decay[is_os(taum, taum_decay)], verbose=False)
+        p4_taum_ss_pi = getp4(taum_decay[is_ss(taum, taum_decay)])
         # tau- pi1-
         print(" --- taum_ss_pi (pi1-) ===>")
-        p4_taum_ss1_pi = p4_taum_ss_pi[:,0:1]
-        #p4_taum_ss1_pi = setp4("PtEtaPhiMLorentzVector",
-        #                       p4_taum_ss1_pi.pt,
-        #                       p4_taum_ss1_pi.eta,
-        #                       p4_taum_ss1_pi.phi,
-        #                       0.1396*ak.ones_like(p4_taum_ss1_pi.pt),
-        #                       p4_taum_ss1_pi.pdgId,
-        #                       verbose=False)
-        # tau- pi-2
+        p4_taum_ss1_pi = p4_taum_ss_pi[:,:,0:1]
         print(" --- taum_ss_pi (pi2-) ===>")
-        p4_taum_ss2_pi = p4_taum_ss_pi[:,1:2]
-        #p4_taum_ss2_pi = setp4("PtEtaPhiMLorentzVector",
-        #                       p4_taum_ss2_pi.pt,
-        #                       p4_taum_ss2_pi.eta,
-        #                       p4_taum_ss2_pi.phi,
-        #                       0.1396*ak.ones_like(p4_taum_ss2_pi.pt),
-        #                       p4_taum_ss2_pi.pdgId,
-        #                       verbose=False)
+        p4_taum_ss2_pi = p4_taum_ss_pi[:,:,1:2]
 
         # tau+ pi-
         print(" --- taup_os_pi (pi-) ===>")
-        p4_taup_os_pi = getp4(taup_decay[taup_decay.pdgId == -211],
-                              verbose=False)
-        #p4_taup_os_pi = setp4("PtEtaPhiMLorentzVector",
-        #                      p4_taup_os_pi.pt,
-        #                      p4_taup_os_pi.eta,
-        #                      p4_taup_os_pi.phi,
-        #                      0.1396*ak.ones_like(p4_taup_os_pi.pt),
-        #                      p4_taup_os_pi.pdgId,
-        #                      verbose=False)
-        # tau+ pi+s
-        p4_taup_ss_pi = getp4(taup_decay[taup_decay.pdgId == 211])
+        p4_taup_os_pi = getp4(taup_decay[is_os(taup, taup_decay)], verbose=False)
+        p4_taup_ss_pi = getp4(taup_decay[is_ss(taup, taup_decay)])
         # tau+ pi1+
         print(" --- taup_ss_pi (pi1+) ===>")
-        p4_taup_ss1_pi = p4_taup_ss_pi[:,0:1]
-        #p4_taup_ss1_pi = setp4("PtEtaPhiMLorentzVector",
-        #                       p4_taup_ss1_pi.pt,
-        #                       p4_taup_ss1_pi.eta,
-        #                       p4_taup_ss1_pi.phi,
-        #                       0.1396*ak.ones_like(p4_taup_ss1_pi.pt),
-        #                       p4_taup_ss1_pi.pdgId,
-        #                       verbose=False)
+        p4_taup_ss1_pi = p4_taup_ss_pi[:,:,0:1]
+        p4_taup_ss1_pi = setp4("PtEtaPhiMLorentzVector",
+                               p4_taup_ss1_pi.pt,
+                               p4_taup_ss1_pi.eta,
+                               p4_taup_ss1_pi.phi,
+                               0.1396*ak.ones_like(p4_taup_ss1_pi.pt),
+                               p4_taup_ss1_pi.pdgId,
+                               verbose=False)
         # tau+ pi2+
         print(" --- taup_ss_pi (pi2+) ===>")
-        p4_taup_ss2_pi = p4_taup_ss_pi[:,1:2]
-        #p4_taup_ss2_pi = setp4("PtEtaPhiMLorentzVector",
-        #                       p4_taup_ss2_pi.pt,
-        #                       p4_taup_ss2_pi.eta,
-        #                       p4_taup_ss2_pi.phi,
-        #                       0.1396*ak.ones_like(p4_taup_ss2_pi.pt),
-        #                       p4_taup_ss2_pi.pdgId,
-        #                       verbose=False)
+        p4_taup_ss2_pi = p4_taup_ss_pi[:,:,1:2]
+        p4_taup_ss2_pi = setp4("PtEtaPhiMLorentzVector",
+                               p4_taup_ss2_pi.pt,
+                               p4_taup_ss2_pi.eta,
+                               p4_taup_ss2_pi.phi,
+                               0.1396*ak.ones_like(p4_taup_ss2_pi.pt),
+                               p4_taup_ss2_pi.pdgId,
+                               verbose=False)
 
         print(f" >>> tau- >>> children [os ss1 ss2] >>> ")
         for i in range(10):

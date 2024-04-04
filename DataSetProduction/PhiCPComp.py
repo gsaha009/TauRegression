@@ -543,7 +543,7 @@ class PhiCPComp(PhiCPBase):
         print(f"PhiCP: {phicp}")
         plotit(arrlist=[ak.ravel(phicp).to_numpy()], bins=9)
         
-        return phicp
+        return phicp, {"h1_unit": h1, "h2_unit": h2, "k1_unit": k1, "k2_unit": k2, "k1_raw": k1raw, "k2_raw": k2raw}
 
     
 

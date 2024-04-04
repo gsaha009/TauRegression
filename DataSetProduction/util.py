@@ -83,7 +83,8 @@ def getp4(genarr: ak.Array, verbose: Optional[bool] = False) -> ak.Array:
             "eta": genarr.eta,
             "phi": genarr.phi,
             "mass": genarr.mass,
-            "pdgId": genarr.pdgId
+            "pdgId": genarr.pdgId,
+            #"charge": genarr.charge,
         },
         with_name="PtEtaPhiMLorentzVector",
         behavior=vector.behavior

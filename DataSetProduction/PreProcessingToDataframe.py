@@ -87,11 +87,11 @@ def tau_selection(events: ak.Array, ele_idxs=None, mu_idxs=None) -> ak.Array:
         & (abs(taus.dz) < 0.2)
         & ((taus.charge == 1) | (taus.charge == -1))
         & (taus.idDecayModeNewDMs)
-        & ((taus.decayMode == 0)
-           | (taus.decayMode == 1)
-           | (taus.decayMode == 2)
-           | (taus.decayMode == 10)
-           | (taus.decayMode == 11))
+        & ((taus.decayModePNet == 0)
+           | (taus.decayModePNet == 1)
+           | (taus.decayModePNet == 2)
+           | (taus.decayModePNet == 10)
+           | (taus.decayModePNet == 11))
         & (taus.idDeepTau2017v2p1VSjet >= 4) #4
         & (taus.idDeepTau2017v2p1VSe >= 2)
         & (taus.idDeepTau2017v2p1VSmu >= 1)
@@ -344,14 +344,19 @@ def tonumpy(arr, maxidx, iscat, isnorm, feat, tag):
         print(key)
         temp = ak.to_numpy(ak.fill_none(ak.firsts(arr[:, idx : idx+1], axis=1), 0.0))
         #temp = ak.to_numpy(ak.fill_none(ak.firsts(arr[:, idx : idx+1], axis=1), 0.0))[:,None]
+        #temp = temp[:,None]
         if iscat:
             print("categorical ---> ")
+            print("first adding the original one ===> ")
+            #temp = temp[:,None]
+            #keylist.append(key)
             npones  = np.ones_like(temp)
             npzeros = np.zeros_like(temp)
             #uniques = np.unique(temp)
             uniques = np.array(_uniques[feat])
             print(f"\tuniques: {uniques}")
             catarray = None
+            keylist.append(key)
             for i, val in enumerate(uniques):
                 #_key = f"{tag}_{val}_{idx+1}"
                 _key = f"{feat}_{int(val)}_{tag}_{idx+1}"
@@ -360,7 +365,8 @@ def tonumpy(arr, maxidx, iscat, isnorm, feat, tag):
                 tempcatarray = np.where(temp == val, npones, npzeros)[:,None]
                 #print(f"\t{tempcatarray}")
                 if i == 0:
-                    catarray = tempcatarray
+                    #catarray = tempcatarray
+                    catarray = np.concatenate((temp[:,None],tempcatarray), axis=1)
                 else:
                     catarray = np.concatenate((catarray, tempcatarray), axis=1)
             temp = catarray
@@ -715,7 +721,7 @@ def get_events_dict(_events:ak.Array, norm: bool, dm: str):
     # calculate from gen-level only:
     # -- get decay modes from gen - level
     # -- compare with reconstructed level DM
-    print(f"charge: {ak.to_list(taus.charge)}")
+    #print(f"charge: {ak.to_list(taus.charge)}")
 
     print(f"taus pt      : {taus.pt}")
     print(f"gentaus pt   : {gentaus.pt}")
@@ -742,6 +748,11 @@ def get_events_dict(_events:ak.Array, norm: bool, dm: str):
         one_prong = (gentaus.DM == 1)
         mask = ak.sum(one_prong, axis=1) == 2
         catstr = "rhorho"
+    elif dm == "1010":
+        one_prong = (gentaus.DM == 10)
+        mask = ak.sum(one_prong, axis=1) == 2
+        catstr = "a1a1"
+
     else:
         print("WARNING: inclusive DM")
     
@@ -756,19 +767,74 @@ def get_events_dict(_events:ak.Array, norm: bool, dm: str):
     gentauprods = gentauprods[mask]
     
 
-    #from IPython import embed; embed()
+
+    # -------------------------------------------------------------------------------------------------------------------------- #
+    # Everything is available now. 
+    # -------------------------------------------------------------------------------------------------------------------------- #
+
+    
+    
+    print(f"adskjcnkj TAU FIELDS: {gentaus.fields}")
+    
+    from IPython import embed; embed()
+    1/0
 
     phi_cp = -99 * ak.ones_like(events.event)[:,None]
-    hasdm = (dm == "00") | (dm == "10") | (dm == "11")
+
+    h1x = -99 * ak.ones_like(events.event)[:,None]
+    h1y = -99 * ak.ones_like(events.event)[:,None]
+    h1z = -99 * ak.ones_like(events.event)[:,None]
+    h2x = -99 * ak.ones_like(events.event)[:,None]
+    h2y = -99 * ak.ones_like(events.event)[:,None]
+    h2z = -99 * ak.ones_like(events.event)[:,None]
+
+    k1x = -99 * ak.ones_like(events.event)[:,None]
+    k1y = -99 * ak.ones_like(events.event)[:,None]
+    k1z = -99 * ak.ones_like(events.event)[:,None]
+    k2x = -99 * ak.ones_like(events.event)[:,None]
+    k2y = -99 * ak.ones_like(events.event)[:,None]
+    k2z = -99 * ak.ones_like(events.event)[:,None]
+
+    k1rx = -99 * ak.ones_like(events.event)[:,None]
+    k1ry = -99 * ak.ones_like(events.event)[:,None]
+    k1rz = -99 * ak.ones_like(events.event)[:,None]
+    k2rx = -99 * ak.ones_like(events.event)[:,None]
+    k2ry = -99 * ak.ones_like(events.event)[:,None]
+    k2rz = -99 * ak.ones_like(events.event)[:,None]
+
+    hasdm = (dm == "00") | (dm == "10") | (dm == "11") | (dm == "1010")
     if hasdm:
         phicp_obj = PhiCPComp(cat=catstr,
                               taum=gentaus[:,0:1],
                               taup=gentaus[:,1:2],
                               taum_decay=gentauprods[:,0:1],
                               taup_decay=gentauprods[:,1:2])
-        phi_cp = phicp_obj.comp_phiCP()
+        phi_cp, hk_dict = phicp_obj.comp_phiCP()
         phi_cp = ak.firsts(phi_cp, axis=1)
+        #print(k_dict["k1_unit"].x, k_dict["k1_unit"].y, k_dict["k1_unit"].z)
+        #print(k_dict["k2_unit"].x, k_dict["k2_unit"].y, k_dict["k2_unit"].z)
+        h1x = ak.firsts(hk_dict["h1_unit"].x, axis=1)
+        h1y = ak.firsts(hk_dict["h1_unit"].y, axis=1)
+        h1z = ak.firsts(hk_dict["h1_unit"].z, axis=1)
+        h2x = ak.firsts(hk_dict["h2_unit"].x, axis=1)
+        h2y = ak.firsts(hk_dict["h2_unit"].y, axis=1)
+        h2z = ak.firsts(hk_dict["h2_unit"].z, axis=1)
+        k1x = ak.firsts(hk_dict["k1_unit"].x, axis=1)
+        k1y = ak.firsts(hk_dict["k1_unit"].y, axis=1)
+        k1z = ak.firsts(hk_dict["k1_unit"].z, axis=1)
+        k2x = ak.firsts(hk_dict["k2_unit"].x, axis=1)
+        k2y = ak.firsts(hk_dict["k2_unit"].y, axis=1)
+        k2z = ak.firsts(hk_dict["k2_unit"].z, axis=1)
+        k1rx = ak.firsts(hk_dict["k1_raw"].x, axis=1)
+        k1ry = ak.firsts(hk_dict["k1_raw"].y, axis=1)
+        k1rz = ak.firsts(hk_dict["k1_raw"].z, axis=1)
+        k2rx = ak.firsts(hk_dict["k2_raw"].x, axis=1)
+        k2ry = ak.firsts(hk_dict["k2_raw"].y, axis=1)
+        k2rz = ak.firsts(hk_dict["k2_raw"].z, axis=1)
 
+    print(f"phi_cp: {phi_cp}")
+    print(f"h1x: {h1x}")
+    print(f"k1x: {k1x}")
     #from IPython import embed; embed()
     """
     mask = ak.fill_none(ak.num(phi_cp, axis=1),0) == 1
@@ -803,8 +869,11 @@ def get_events_dict(_events:ak.Array, norm: bool, dm: str):
     #np_target_feats = np.concatenate((np_target_feats, phi_cp), axis=1)
     #target_keys = target_keys + ["phicp"]
     #from IPython import embed; embed()
-    extra_feats = ak.to_numpy(phi_cp)
-    extra_keys = ["phicp"]
+    extra_feats = ak.concatenate([phi_cp, 
+                                  h1x, h1y, h1z, h2x, h2y, h2z,
+                                  k1x, k1y, k1z, k2x, k2y, k2z, k1rx, k1ry, k1rz, k2rx, k2ry, k2rz], axis=1)
+    extra_feats = ak.to_numpy(extra_feats)
+    extra_keys = ["phicp", "h1x", "h1y", "h1z", "h2x", "h2y", "h2z", "k1x", "k1y", "k1z", "k2x", "k2y", "k2z", "k1rx", "k1ry", "k1rz", "k2rx", "k2ry", "k2rz"]
 
     #from IPython import embed; embed()
 
