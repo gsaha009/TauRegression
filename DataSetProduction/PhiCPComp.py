@@ -63,8 +63,8 @@ class PhiCPComp(PhiCPBase):
         printinfo(p4_pi, "p")
         print("  Pi0: ")
         printinfo(p4_pi0, "p")
-        print("  Nu: ")
-        printinfo(p4_nu, "p")
+        #print("  Nu: ")
+        #printinfo(p4_nu, "p")
         
         
         Tau = self.setboost(p4_tau, boostvec)

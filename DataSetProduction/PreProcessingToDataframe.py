@@ -87,14 +87,15 @@ def tau_selection(events: ak.Array, ele_idxs=None, mu_idxs=None) -> ak.Array:
         & (abs(taus.dz) < 0.2)
         & ((taus.charge == 1) | (taus.charge == -1))
         & (taus.idDecayModeNewDMs)
-        & ((taus.decayModePNet == 0)
-           | (taus.decayModePNet == 1)
-           | (taus.decayModePNet == 2)
-           | (taus.decayModePNet == 10)
-           | (taus.decayModePNet == 11))
-        & (taus.idDeepTau2017v2p1VSjet >= 4) #4
-        & (taus.idDeepTau2017v2p1VSe >= 2)
-        & (taus.idDeepTau2017v2p1VSmu >= 1)
+        & (taus.decayModePNet == 1)
+        #& ((taus.decayModePNet == 0)
+        #   | (taus.decayModePNet == 1)
+        #   | (taus.decayModePNet == 2)
+        #   | (taus.decayModePNet == 10)
+        #   | (taus.decayModePNet == 11))
+        & (taus.idDeepTau2018v2p5VSjet >= 4)
+        & (taus.idDeepTau2018v2p5VSe >= 2)
+        & (taus.idDeepTau2018v2p5VSmu >= 1)
     )
     if ele_idxs is not None:
         tau_mask = tau_mask & ak.all(taus.metric_table(events.Electron[ele_idxs]) > 0.2, axis=2)
@@ -649,7 +650,6 @@ def get_events_dict(_events:ak.Array, norm: bool, dm: str):
 
     gentaus = ak.concatenate([gentaum, gentaup], axis=1)
 
-
     _taus = gentaus.nearest(taus, threshold=0.4)
 
     mask = (ak.num(_taus, axis=1) == 2) & (ak.sum(taus.charge, axis=1) == 0)
@@ -776,10 +776,64 @@ def get_events_dict(_events:ak.Array, norm: bool, dm: str):
     
     print(f"adskjcnkj TAU FIELDS: {gentaus.fields}")
     
-    from IPython import embed; embed()
-    1/0
+    is_pi = np.abs(tauprods_concat.pdgId) == 211
+    is_gm = np.abs(tauprods_concat.pdgId) == 22
+    
+    #pions  = tauprods_concat[is_pi]
+    #gammas = tauprods_concat[is_gm]
+
+    has_one_pi = ak.sum(is_pi, axis=-1) == 1
+    has_atleast_one_gamma = ak.sum(is_gm, axis=-1) > 0
+
+    evt_mask = ak.sum((has_one_pi & has_atleast_one_gamma), axis=1) == 2
+    empty_indices = tauprods_concat[:,:,:0]
+
+    pions = ak.where(has_one_pi, tauprods_concat[is_pi], empty_indices)
+    photons = ak.where(has_atleast_one_gamma, tauprods_concat[is_gm], empty_indices)
+
+    #tauprods_skimmed = ak.where(evt_mask, tauprods_concat[(is_pi | is_gm)], empty_indices)
+    pions   = ak.where(evt_mask, tauprods_concat[is_pi], empty_indices)
+    photons = ak.where(evt_mask, tauprods_concat[is_gm], empty_indices)
+    sorted_idx_photons = ak.argsort(photons.pt, ascending=False)
+    photons = photons[sorted_idx_photons] # already sorted before
+    
+    eta_pizeros  = ak.firsts(photons.eta, axis=-1)[:,:,None]
+    phi_pizeros  = ak.firsts(photons.phi, axis=-1)[:,:,None]
+    mass_pizeros = 0.1396*ak.ones_like(phi_pizeros)
+    pt_pizeros   = ak.sum(photons.pt, axis=-1)[:,:,None]
+
+    pions_p4 = getP4(pions)
+    pizeros_p4 = ak.zip(
+        {
+            "pt"  : pt_pizeros,
+            "eta" : eta_pizeros,
+            "phi" : phi_pizeros,
+            "mass": mass_pizeros,
+            "pdgId": 111*ak.ones_like(mass_pizeros),
+        },
+        with_name="PtEtaPhiMLorentzVector",
+        behavior=vector.behavior
+    )
+
+        
+    tauprods_dm11 = ak.concatenate([pions_p4,pizeros_p4], axis=-1)
+
+    
+    events      = events[evt_mask] 
+    taus        = taus[evt_mask]
+    tau1prods   = tau1prods[evt_mask]
+    tau2prods   = tau2prods[evt_mask] 
+    tauprods_concat = ak.concatenate([tau1prods[:,None], tau2prods[:,None]], axis=1)
+    jets        = jets[evt_mask] 
+    gentaus     = gentaus[evt_mask]
+    gentaunus   = gentaunus[evt_mask]
+    gentauprods = gentauprods[evt_mask]
+
+    tauprods_dm11 = tauprods_dm11[evt_mask]
+
 
     phi_cp = -99 * ak.ones_like(events.event)[:,None]
+    phi_cp_det = -99 * ak.ones_like(events.event)[:,None]
 
     h1x = -99 * ak.ones_like(events.event)[:,None]
     h1y = -99 * ak.ones_like(events.event)[:,None]
@@ -804,6 +858,7 @@ def get_events_dict(_events:ak.Array, norm: bool, dm: str):
 
     hasdm = (dm == "00") | (dm == "10") | (dm == "11") | (dm == "1010")
     if hasdm:
+        from IPython import embed; embed()
         phicp_obj = PhiCPComp(cat=catstr,
                               taum=gentaus[:,0:1],
                               taup=gentaus[:,1:2],
@@ -832,10 +887,33 @@ def get_events_dict(_events:ak.Array, norm: bool, dm: str):
         k2ry = ak.firsts(hk_dict["k2_raw"].y, axis=1)
         k2rz = ak.firsts(hk_dict["k2_raw"].z, axis=1)
 
+
+        phicp_det_obj = PhiCPComp(cat=catstr,
+                                  taum=gentaus[:,0:1],
+                                  taup=gentaus[:,1:2],
+                                  taum_decay=tauprods_dm11[:,0:1],
+                                  taup_decay=tauprods_dm11[:,1:2])
+        phi_cp_det, _ = phicp_det_obj.comp_phiCP()
+        phi_cp_det = ak.firsts(phi_cp_det, axis=1)
+
+
     print(f"phi_cp: {phi_cp}")
+    print(f"phi_cp (det): {phi_cp_det}")
     print(f"h1x: {h1x}")
     print(f"k1x: {k1x}")
     #from IPython import embed; embed()
+
+    pions = tauprods_dm11[np.abs(tauprods_dm11.pdgId) == 211]
+    pizeros = tauprods_dm11[np.abs(tauprods_dm11.pdgId) == 111]
+
+    pi1 = ak.firsts(pions[:,0:1])
+    pi2 = ak.firsts(pions[:,1:2])
+    pi01 = ak.firsts(pizeros[:,0:1])
+    pi02 = ak.firsts(pizeros[:,1:2])
+    
+    tau_prod_dict = {"pi1": pi1, "pi2": pi2, "pi01": pi01, "pi02": pi02}
+
+
     """
     mask = ak.fill_none(ak.num(phi_cp, axis=1),0) == 1
     
@@ -869,11 +947,31 @@ def get_events_dict(_events:ak.Array, norm: bool, dm: str):
     #np_target_feats = np.concatenate((np_target_feats, phi_cp), axis=1)
     #target_keys = target_keys + ["phicp"]
     #from IPython import embed; embed()
-    extra_feats = ak.concatenate([phi_cp, 
+
+    #from IPython import embed; embed()
+    #1/0
+
+
+    extra_feats = ak.concatenate([phi_cp, phi_cp_det,
                                   h1x, h1y, h1z, h2x, h2y, h2z,
-                                  k1x, k1y, k1z, k2x, k2y, k2z, k1rx, k1ry, k1rz, k2rx, k2ry, k2rz], axis=1)
+                                  k1x, k1y, k1z, k2x, k2y, k2z, k1rx, k1ry, k1rz, k2rx, k2ry, k2rz,
+                                  tau_prod_dict["pi1"].pt, tau_prod_dict["pi1"].eta, tau_prod_dict["pi1"].phi, tau_prod_dict["pi1"].mass,
+                                  tau_prod_dict["pi2"].pt, tau_prod_dict["pi2"].eta, tau_prod_dict["pi2"].phi, tau_prod_dict["pi2"].mass,
+                                  tau_prod_dict["pi01"].pt, tau_prod_dict["pi01"].eta, tau_prod_dict["pi01"].phi, tau_prod_dict["pi01"].mass,
+                                  tau_prod_dict["pi02"].pt, tau_prod_dict["pi02"].eta, tau_prod_dict["pi02"].phi, tau_prod_dict["pi02"].mass], axis=1)
     extra_feats = ak.to_numpy(extra_feats)
-    extra_keys = ["phicp", "h1x", "h1y", "h1z", "h2x", "h2y", "h2z", "k1x", "k1y", "k1z", "k2x", "k2y", "k2z", "k1rx", "k1ry", "k1rz", "k2rx", "k2ry", "k2rz"]
+    extra_keys = ["phicp", "phi_cp_det", 
+                  "h1x", "h1y", "h1z", 
+                  "h2x", "h2y", "h2z", 
+                  "k1x", "k1y", "k1z", 
+                  "k2x", "k2y", "k2z", 
+                  "k1rx", "k1ry", "k1rz", 
+                  "k2rx", "k2ry", "k2rz",
+                  "pt_pi_1", "eta_pi_1", "phi_pi_1", "mass_pi_1",
+                  "pt_pi_2", "eta_pi_2", "phi_pi_2", "mass_pi_2",
+                  "pt_pi0_1", "eta_pi0_1", "phi_pi0_1", "mass_pi0_1",
+                  "pt_pi0_2", "eta_pi0_2", "phi_pi0_2", "mass_pi0_2",
+              ]
 
     #from IPython import embed; embed()
 
@@ -890,6 +988,8 @@ def get_events_dict(_events:ak.Array, norm: bool, dm: str):
     #data  = pd.DataFrame(all_feats, columns=all_keys) 
     #print(list(data.keys()))
     #print(data.head(10))
+
+
 
     return all_feats, all_keys
 

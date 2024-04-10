@@ -4,73 +4,15 @@ indir:
   #- /Volumes/WorkExtHDD/DY_NanoAOD_v10/DYJetsToLL_M-50-madgraphMLM
   #- /Volumes/WorkExtHDD/DY_NanoAOD_v10/DYJetsToLL_M-50-madgraphMLM_ext1
   - /sps/cms/gsaha/GluGluHToTauTau_M125
+
+outdir: /sps/cms/gsaha/GluGluHToTauTauOutput
+
   
-catstokeep:
-  - event
-  - Electron
-  - Muon
-  - Jet
-  - Tau
-  - Photon
-  - MET
-  - PV
-  - GenPart
+isnorm: True
 
-nodefeats_to_keep:
-    pt:
-      type: num
-      found: True
-    eta:
-      type: num
-      found: True
-    phi:
-      type: num
-      found: True
-    mass:
-      type: num
-      found: True
-    dxy:
-      type: num
-      found: True
-    dz:
-      type: num
-      found: True
-    rawDeepTau2017v2p1VSe:
-      type: num
-      found: True
-    rawDeepTau2017v2p1VSjet:
-      type: num
-      found: True
-    rawDeepTau2017v2p1VSmu:
-      type: num
-      found: True
-    rawIsodR03:
-      type: num
-      found: True
-    rawMVAnewDM2017v2:
-      type: num
-      found: True
-    leadTkPtOverTauPt:
-      type: num
-      found: True
-    btagDeepFlavB:
-      type: num
-      found: True
-    charge:
-      type: cat
-      found: True
-    decayMode:
-      type: cat
-      found: True
-    istau:
-      type: custom
-      found: False
-    isjet:
-      type: custom
-      found: False
+tau1dm: 1
+tau2dm: 1
 
+isForTrain: False
 
-targetfeats_to_keep:
-  - px
-  - py
-  - pz
+howtogetpizero: simple_IC

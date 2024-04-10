@@ -1,5 +1,7 @@
 import os
 import sys
+import yaml
+import glob
 import numpy as np
 import awkward as ak
 import matplotlib.pyplot as plt
@@ -83,8 +85,8 @@ def getp4(genarr: ak.Array, verbose: Optional[bool] = False) -> ak.Array:
             "eta": genarr.eta,
             "phi": genarr.phi,
             "mass": genarr.mass,
-            "pdgId": genarr.pdgId,
-            #"charge": genarr.charge,
+            "pdgId": genarr.pdgId if "pdgId" in genarr.fields else -99.9*ak.ones_like(genarr.pt),
+            "tauIdx": genarr.pdgId if "tauIdx" in genarr.fields else -99.9*ak.ones_like(genarr.pt),
         },
         with_name="PtEtaPhiMLorentzVector",
         behavior=vector.behavior
@@ -265,3 +267,76 @@ def Rotate(vect, rotvect):
     return vect
 
     
+def invariant_mass(events: ak.Array) -> ak.Array:
+    empty_events = ak.zeros_like(events, dtype=np.uint16)[:, 0:0]
+    where = ak.num(events, axis=1) == 2
+    events_2 = ak.where(where, events, empty_events)
+    mass = ak.fill_none(ak.firsts((1 * events_2[:, :1] + 1 * events_2[:, 1:2]).mass), 0)
+    return mass
+
+def getconfig(filepath):
+    with open(filepath,'r') as conf:
+        config = yaml.safe_load(conf)
+    return config
+
+def getlistofinputs(paths):
+    files = []
+    for path in paths:
+        temp = glob.glob(f"{path}/*.root")
+        files = files + temp
+    print(f"Files: {files}")
+    return files
+
+
+def get_MT(objs: ak.Array, met: ak.Array) -> ak.Array:
+    dphi = (1*objs).delta_phi(1*met)
+    dphi = ak.fill_none(ak.firsts(dphi, axis=1), 0.0)
+    #print(f"dphi: {dphi}")
+    mt = np.sqrt(2*met.pt*objs.pt*(1 - np.cos(dphi)))
+    #print(f"mt: {mt}")
+    return mt
+    #return ak.fill_none(ak.firsts(mt, axis=1), 0.0)
+
+    
+def get_total_MT(obj1: ak.Array, obj2: ak.Array, met: ak.Array) -> ak.Array:
+    return np.sqrt((get_MT(obj1, met))**2 + get_MT(obj2, met)**2 + get_MT(obj1, obj2)**2)
+
+
+def findDecayMode(Nc, Np): 
+    return 5 * (Nc - 1) + Np
+
+
+def genDM(prod: ak.Array):
+    pids = prod.pdgId
+    is_charged = ((np.abs(pids) == 211) 
+                  | (np.abs(pids) == 321))
+    is_neutral = ((pids == 111) | (pids == 311))
+    
+    Nc = ak.sum(is_charged, axis=-1)
+    Np = ak.sum(is_neutral, axis=-1)
+
+    dm = findDecayMode(Nc, Np)
+    
+    return dm
+
+
+def plotdf(df, outf):
+    keys = list(df.keys())
+    nkeys = len(keys)
+    ncols = 10
+    nrows = int(np.ceil(nkeys/10))
+
+    plt.figure(figsize=(4*ncols,2*nrows))
+    for idx, key in enumerate(keys):
+        idx=idx+1
+        ax = plt.subplot(nrows,ncols,idx)
+        arr = df[key]
+        
+        ax.hist(arr, 50, histtype="stepfilled", alpha=0.7, log=False)
+        
+        ax.set_title(f"{key}")
+        ax.set_xlabel(f"{key}")
+        #ax.legend()
+
+    plt.tight_layout()
+    plt.savefig(f'{outf}', dpi=300)
