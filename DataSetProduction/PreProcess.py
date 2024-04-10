@@ -120,7 +120,7 @@ def main():
     _item_2 = "Norm" if isnorm else "Raw"
     _item_3 = f"{tau1dm}{tau2dm}"
     
-    _name = f'GluGluHToTauTauSMdata_{_item_1}_{_item_2}_{_item_3}_{datetime_tag}'
+    _name = f'GluGluHToTauTauSMdata_{_item_1}_{_item_2}_{_item_3}_{howtogetpizero}_{datetime_tag}'
 
     pltname = os.path.join(outdir, f"{_name}.pdf")
     h5name  = os.path.join(outdir, f"{_name}.h5")

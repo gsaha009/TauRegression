@@ -18,13 +18,14 @@ class obj(object):
             else:
                 setattr(self, k, obj(v) if isinstance(v, dict) else v)
 
-def setp4_(arr: ak.Array, mass: float):
+def setp4_(arr: ak.Array, mass: Optional[float] = None, pdgId: Optional[int] = 111):
     return ak.zip(
         {
             "pt": arr.pt,
             "eta": arr.eta,
             "phi": arr.phi,
-            "mass": mass*ak.ones_like(arr.pt),
+            "mass": arr.mass if mass == None else mass*ak.ones_like(arr.pt),
+            "pdgId": pdgId * ak.ones_like(arr.pt),
         },
         with_name="PtEtaPhiMLorentzVector",
         behavior=vector.behavior
@@ -340,3 +341,20 @@ def plotdf(df, outf):
 
     plt.tight_layout()
     plt.savefig(f'{outf}', dpi=300)
+
+
+
+def getMaxEtaTauStrip(pt):
+    # maxEta = max(0.05, min(0.15, 0.20*math.pow(cand.pt(),-0.66)))
+    temp = 0.20 * np.power(pt, -0.66)
+    ref1 = ak.where(temp > 0.15, 0.15, temp)
+    ref2 = ak.where(ref1 > 0.05, ref1, 0.05)
+    return ref2
+
+def getMaxPhiTauStrip(pt):
+    #maxPhi = max(0.05, min(0.30, 0.35*math.pow(cand.pt(),-0.71)))
+    temp = 0.35 * np.power(pt, -0.71)
+    ref1 = ak.where(temp > 0.30, 0.30, temp)
+    ref2 = ak.where(ref1 > 0.05, ref1, 0.05)
+    return ref2
+

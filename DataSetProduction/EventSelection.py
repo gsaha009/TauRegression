@@ -48,6 +48,9 @@ class SelectEvents:
         self.howtogetpizero = howtogetpizero
         if self.howtogetpizero not in ["simple_IC", "simple_MB", "XGB_MB"]:
             raise RuntimeError(f"{self.howtogetpizero} is not mentioned as recommended")
+        self.pi0RecoM = 0.136 #approximate pi0 peak from fits in PF paper
+        self.pi0RecoW = 0.013 #approximate width of pi0 peak from early in PF paper
+
         
         
     def muon_selection(self) -> tuple[dict, ak.Array]:
@@ -259,6 +262,19 @@ class SelectEvents:
         photons = photons[sorted_idx_photons] # already sorted before
         # add photons p4 and later sum those p4s in the simple_IC method
         photons_p4 = getp4(photons)
+
+
+        evt_mask_1 = events.event >= 0
+        evt_mask_2 = events.event >= 0
+        if self.tau1dm == 1 and self.tau2dm == 1:
+            evt_mask_1 = ak.sum((has_one_pion & has_atleast_one_gamma), axis=1) >= 2
+            if self.isForTrain:
+                #if self.tau1dm == 1 and self.tau2dm == 1:
+                #evt_mask_1 = 
+                one_prong = (gentaus.DM == 1)
+                evt_mask_2 = ak.sum(one_prong, axis=1) == 2
+
+
         
         pizeros_p4 = getp4(photons[:,0:1]) # dummy
         if self.howtogetpizero == "simple_IC":
@@ -282,8 +298,146 @@ class SelectEvents:
                 behavior=vector.behavior
             )
 
+
         elif self.howtogetpizero == "simple_MB":
-            pass
+            emptyp4 = 1 * taus[:,:0]
+            atleast_one_gamma_evt_mask = ak.sum(has_atleast_one_gamma, axis=1) == 2
+            tau1p4 = ak.where(atleast_one_gamma_evt_mask, 1 * taus[:,0:1], emptyp4)
+            tau2p4 = ak.where(atleast_one_gamma_evt_mask, 1 * taus[:,1:2], emptyp4)
+            photons_tau1_p4 = ak.where(atleast_one_gamma_evt_mask, 
+                                       ak.firsts(photons_p4[:,0:1], axis=1),
+                                       emptyp4)
+            photons_tau2_p4 = ak.where(atleast_one_gamma_evt_mask,
+                                       ak.firsts(photons_p4[:,1:2], axis=1),
+                                       emptyp4)
+            deta_photons_tau1 = ak.firsts((photons_tau1_p4).metric_table(tau1p4, 
+                                                                         metric = lambda a,b: np.abs(a.eta - b.eta)), 
+                                          axis=-1)
+            dphi_photons_tau1 = ak.firsts((photons_tau1_p4).metric_table(tau1p4, 
+                                                                         metric = lambda a,b: np.abs(a.delta_phi(b))), 
+                                          axis=-1)
+
+            deta_photons_tau2 = ak.firsts((photons_tau2_p4).metric_table(tau2p4, 
+                                                                         metric = lambda a,b: np.abs(a.eta - b.eta)),
+                                          axis=-1)
+            dphi_photons_tau2 = ak.firsts((photons_tau2_p4).metric_table(tau2p4, 
+                                                                         metric = lambda a,b: np.abs(a.delta_phi(b))),
+                                          axis=-1)
+
+
+            maxeta_photons_tau1 = getMaxEtaTauStrip(photons_tau1_p4.pt)
+            maxphi_photons_tau1 = getMaxPhiTauStrip(photons_tau1_p4.pt)
+            maxeta_photons_tau2 = getMaxEtaTauStrip(photons_tau2_p4.pt)
+            maxphi_photons_tau2 = getMaxPhiTauStrip(photons_tau2_p4.pt)
+
+            mask_photons_tau1 = ((np.abs(deta_photons_tau1) < maxeta_photons_tau1) 
+                                 & (np.abs(dphi_photons_tau1) < maxphi_photons_tau1))
+            mask_photons_tau2 = ((np.abs(deta_photons_tau2) < maxeta_photons_tau2) 
+                                 & (np.abs(dphi_photons_tau2) < maxphi_photons_tau2))
+
+
+            strip_photons_tau1_p4 = ak.zip(
+                {
+                    "pt": photons_tau1_p4.pt[mask_photons_tau1],
+                    "eta": photons_tau1_p4.eta[mask_photons_tau1],
+                    "phi": photons_tau1_p4.phi[mask_photons_tau1],
+                    "mass": photons_tau1_p4.mass[mask_photons_tau1],
+                },
+                with_name="PtEtaPhiMLorentzVector",
+                behavior=vector.behavior
+            )
+            strip_photons_tau2_p4 = ak.zip(
+                {
+                    "pt": photons_tau2_p4.pt[mask_photons_tau2],
+                    "eta": photons_tau2_p4.eta[mask_photons_tau2],
+                    "phi": photons_tau2_p4.phi[mask_photons_tau2],
+                    "mass": photons_tau2_p4.mass[mask_photons_tau2],
+                },
+                with_name="PtEtaPhiMLorentzVector",
+                behavior=vector.behavior
+            )
+
+
+            #strip_photons_tau1_p4  = 1 * photons_tau1_p4[mask_photons_tau1]
+            #strip_photons_tau2_p4  = 1 * photons_tau2_p4[mask_photons_tau2]
+
+            evt_mask_1 = evt_mask_1 & ((ak.sum(mask_photons_tau1, axis=1) > 0) & (ak.sum(mask_photons_tau2, axis=1) > 0))
+
+            tau1p4 = ak.where(evt_mask_1, tau1p4, emptyp4)
+            tau2p4 = ak.where(evt_mask_1, tau2p4, emptyp4)
+            strip_photons_tau1_p4 = ak.where(evt_mask_1, strip_photons_tau1_p4, emptyp4)
+            strip_photons_tau2_p4 = ak.where(evt_mask_1, strip_photons_tau2_p4, emptyp4)
+
+
+            has_one_photon_tau1 = ak.num(strip_photons_tau1_p4.pt, axis=1) == 1
+            has_one_photon_tau2 = ak.num(strip_photons_tau2_p4.pt, axis=1) == 1
+
+
+            dphi_photons_tau1 = ak.firsts((strip_photons_tau1_p4).metric_table(tau1p4, 
+                                                                               metric = lambda a,b: np.abs(a.delta_phi(b))), 
+                                          axis=-1)
+            closest_photons_idx_tau1 = ak.argsort(dphi_photons_tau1)
+            strip_photons_tau1_p4    = strip_photons_tau1_p4[closest_photons_idx_tau1] 
+            
+            dphi_photons_tau2 = ak.firsts((strip_photons_tau2_p4).metric_table(tau2p4, 
+                                                                               metric = lambda a,b: np.abs(a.delta_phi(b))), 
+                                          axis=-1)
+            closest_photons_idx_tau2 = ak.argsort(dphi_photons_tau2)
+            strip_photons_tau2_p4    = strip_photons_tau2_p4[closest_photons_idx_tau2] 
+            
+            
+            strip_photons_tau1_p4_pair = ak.combinations(strip_photons_tau1_p4, 2, axis=1)
+            strip_photons_tau1_p4_pair_0, strip_photons_tau1_p4_pair_1 = ak.unzip(strip_photons_tau1_p4_pair)
+            strip_photons_tau1_mass = (strip_photons_tau1_p4_pair_0 + strip_photons_tau1_p4_pair_1).mass
+            mass_val = np.abs(strip_photons_tau1_mass - self.pi0RecoM)
+            mass_sorted_idx_tau1 = ak.argsort(mass_val, axis=1)
+            strip_photons_tau1_p4_pair_sorted = strip_photons_tau1_p4_pair[mass_sorted_idx_tau1]
+            mass_mask_tau1 = mass_val < 2*self.pi0RecoW
+            evt_mask_no_pair = ak.sum(mass_mask_tau1, axis=1) == 0
+            strip_photons_tau1_p4_pair_sorted_pass_mass = strip_photons_tau1_p4_pair_sorted[mass_mask_tau1]
+            strip_photons_tau1_p4_mass_selected = ak.concatenate([strip_photons_tau1_p4_pair_sorted_pass_mass["0"][:,:1],
+                                                                  strip_photons_tau1_p4_pair_sorted_pass_mass["1"][:,:1]], axis=1)
+
+            sel_strip_photons_tau1_p4 = ak.where(has_one_photon_tau1, 
+                                                 strip_photons_tau1_p4, 
+                                                 ak.where(evt_mask_no_pair,
+                                                          strip_photons_tau1_p4[:,:1],
+                                                          strip_photons_tau1_p4_mass_selected)
+                                             )
+
+            sel_strip_pizero_tau1_p4 = ak.from_regular(ak.sum(sel_strip_photons_tau1_p4, axis=-1)[:,None])
+
+            strip_photons_tau2_p4_pair = ak.combinations(strip_photons_tau2_p4, 2, axis=1)
+            strip_photons_tau2_p4_pair_0, strip_photons_tau2_p4_pair_1 = ak.unzip(strip_photons_tau2_p4_pair)
+            strip_photons_tau2_mass = (strip_photons_tau2_p4_pair_0 + strip_photons_tau2_p4_pair_1).mass
+            mass_val = np.abs(strip_photons_tau2_mass - self.pi0RecoM)
+            mass_sorted_idx_tau2 = ak.argsort(mass_val, axis=1)
+            strip_photons_tau2_p4_pair_sorted = strip_photons_tau2_p4_pair[mass_sorted_idx_tau2]
+            mass_mask_tau2 = mass_val < 2*self.pi0RecoW
+            evt_mask_no_pair = ak.sum(mass_mask_tau2, axis=1) == 0
+            strip_photons_tau2_p4_pair_sorted_pass_mass = strip_photons_tau2_p4_pair_sorted[mass_mask_tau2]
+            strip_photons_tau2_p4_mass_selected = ak.concatenate([strip_photons_tau2_p4_pair_sorted_pass_mass["0"][:,:1],
+                                                                  strip_photons_tau2_p4_pair_sorted_pass_mass["1"][:,:1]], axis=1)
+
+            sel_strip_photons_tau2_p4 = ak.where(has_one_photon_tau2, 
+                                                 strip_photons_tau2_p4, 
+                                                 ak.where(evt_mask_no_pair,
+                                                          strip_photons_tau2_p4[:,:1],
+                                                          strip_photons_tau2_p4_mass_selected)
+                                             )
+
+            sel_strip_pizero_tau2_p4 = ak.from_regular(ak.sum(sel_strip_photons_tau2_p4, axis=-1)[:,None])
+
+
+            
+            #from IPython import embed; embed()
+            #1/0
+
+
+            pizeros_p4 = ak.concatenate([sel_strip_pizero_tau1_p4[:,None], sel_strip_pizero_tau2_p4[:,None]], axis=1)
+            pizeros_p4 = setp4_(pizeros_p4, pdgId = 111)
+
+
 
         elif self.howtogetpizero == "XGB_MB":
             pass
@@ -291,15 +445,6 @@ class SelectEvents:
         else:
             raise RuntimeError("wrong method for howtogetpizero")
 
-        evt_mask_1 = events.event >= 0
-        evt_mask_2 = events.event >= 0
-        if self.tau1dm == 1 and self.tau2dm == 1:
-            evt_mask_1 = ak.sum((has_one_pion & has_atleast_one_gamma), axis=1) >= 2
-            if self.isForTrain:
-                #if self.tau1dm == 1 and self.tau2dm == 1:
-                #evt_mask_1 = 
-                one_prong = (gentaus.DM == 1)
-                evt_mask_2 = ak.sum(one_prong, axis=1) == 2
         
         tauprod_results = {
             "steps": {

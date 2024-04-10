@@ -6,13 +6,12 @@ indir:
   - /sps/cms/gsaha/GluGluHToTauTau_M125
 
 outdir: /sps/cms/gsaha/GluGluHToTauTauOutput
-
   
 isnorm: True
 
 tau1dm: 1
 tau2dm: 1
 
-isForTrain: False
+isForTrain: True
 
-howtogetpizero: simple_IC
+howtogetpizero: simple_MB
