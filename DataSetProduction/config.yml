@@ -7,11 +7,11 @@ indir:
 
 outdir: /sps/cms/gsaha/GluGluHToTauTauOutput
   
-isnorm: True
+isnorm: False
 
 tau1dm: 1
 tau2dm: 1
 
 isForTrain: True
 
-howtogetpizero: simple_MB
+howtogetpizero: simple_IC

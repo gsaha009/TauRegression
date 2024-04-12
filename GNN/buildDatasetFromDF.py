@@ -5,6 +5,9 @@ import awkward as ak
 import numpy as np
 import pandas as pd
 import itertools
+from sklearn.preprocessing import MinMaxScaler
+import logging
+logger = logging.getLogger('main')
 import vector
 import warnings
 warnings.simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
@@ -15,10 +18,12 @@ from coffea.nanoevents.methods import candidate
 import torch
 import torch.nn as nn
 os.environ['TORCH'] = torch.__version__
-#print(torch.__version__)
+logger.info(torch.__version__)
 
 from torch_geometric.data import Data, Dataset, InMemoryDataset
-from util import PlotUtil
+from util import PlotUtil, plotdf
+from mainutil import normalise_column
+
 
 
 class ZtoTauTauDataset(InMemoryDataset):
@@ -33,6 +38,7 @@ class ZtoTauTauDataset(InMemoryDataset):
                  #target_types: list,
                  target_feats: list,
                  global_feats: list,
+                 do_norm: bool = True,
                  do_plot: bool = True,
                  transform : Optional[Callable] = None, 
                  pre_transform : Optional[Callable] = None,
@@ -40,13 +46,13 @@ class ZtoTauTauDataset(InMemoryDataset):
                  force_reload: bool = False,
     ):
         #self.load(self.processed_paths[0])
-        print(f"constructor called")
-
+        #print(f"constructor called")
+        
         self.root = root
         print(self.root)
         self.df_name = df_name
         print(self.df_name)
-        self.proc_name = proc_name
+        self.proc_name = f"Norm_{proc_name}" if do_norm else f"Raw_{proc_name}" 
         self.gpu_id = gpu_id
         self.nodetypes = node_types
         self.nodefeats = node_feats
@@ -55,9 +61,10 @@ class ZtoTauTauDataset(InMemoryDataset):
         self.globalfeats = global_feats
         
         self.plotdir = plotdir
+        self.donorm = do_norm
         self.doplot = do_plot
 
-        print(f"mother constructor called")
+        #print(f"mother constructor called")
         super(ZtoTauTauDataset, self).__init__(root,
                                                transform,
                                                pre_transform,
@@ -69,7 +76,7 @@ class ZtoTauTauDataset(InMemoryDataset):
     #@property
     #def raw_dir(self) -> str:
     #    return os.path.join(self.root, 'raw', 'norm')
-
+    
     @property
     def raw_file_names(self):
         return self.df_name
@@ -83,10 +90,10 @@ class ZtoTauTauDataset(InMemoryDataset):
 
     def _add_dummies(self, col_names):
         _df = self.df.copy(deep=True)
-        print(f"df after deepcopy: \n{_df.head(10)}")
+        logger.info(f"df after deepcopy: \n{_df.head(10)}")
         for col_name in col_names:
             if col_name not in self.df.keys():
-                print(f"WARNING: {col_name} not in df, adding zeros")
+                logger.warning(f"{col_name} not in df, adding zeros")
                 _df[col_name] = 0.0
 
         _df = _df.fillna(0)
@@ -104,31 +111,80 @@ class ZtoTauTauDataset(InMemoryDataset):
 
     def _transform_from_dataframe(self):
         #print("_transform_from_dataframe called")
-        tau_feat_names = []
-        jet_feat_names = []
-        for feat in self.nodefeats:
-            print(f"Feature: {feat}")
-            tau_feat_names += self._col_key_list(feat, 2, "tau")
-            jet_feat_names += self._col_key_list(feat, 10, "jet")
-        print(f"tau_feat_names: {tau_feat_names}")
-        print(f"jet_feat_names: {jet_feat_names}")
+        tau_cat_feat_names = []
+        jet_cat_feat_names = []
+        tau_num_feat_names = []
+        jet_num_feat_names = []
+
+        allnodefeats = self.nodefeats.numerical + self.nodefeats.categorical
+
+        for feat in self.nodefeats.numerical:
+            logger.info(f"Feature: {feat}")
+            tau_num_feat_names += self._col_key_list(feat, 2, "tau")
+            jet_num_feat_names += self._col_key_list(feat, 10, "jet")
+            
+        for feat in self.nodefeats.categorical:
+            logger.info(f"Feature: {feat}")
+            tau_cat_feat_names += self._col_key_list(feat, 2, "tau")
+            jet_cat_feat_names += self._col_key_list(feat, 10, "jet")
+            
+            
+        tau_feat_names = tau_num_feat_names + tau_cat_feat_names
+        jet_feat_names = jet_num_feat_names + jet_cat_feat_names
+
+        #for feat in allnodefeats:
+        #    print(f"Feature: {feat}")
+        #    tau_feat_names += self._col_key_list(feat, 2, "tau")
+        #    jet_feat_names += self._col_key_list(feat, 10, "jet")
+        logger.info(f"tau_feat_names: {tau_feat_names}")
+        logger.info(f"jet_feat_names: {jet_feat_names}")
 
         # new df with dummy cols
         #_df = self.df.copy(deep=True)
         #df = self._add_dummies(_df, tau_feat_names + jet_feat_names)
         df = self._add_dummies(tau_feat_names + jet_feat_names)
         #df = pd.concat([self.df.copy(deep=True), df_temp], axis=1)
-        
-        print("df with all columns :--> ")
-        print(list(df.keys()))
-        print(df.head(10))
 
+        logger.info("df with all columns :--> ")
+        logger.info(list(df.keys()))
+        logger.info(f"\n{df.head(10)}")
+        if self.doplot:
+            #logger.info("Plotting the modified [raw] dataframe ... ")
+            #plotdf(df, os.path.join(self.plotdir, f"{self.df_name}_Modified_Raw.pdf"))
+            logger.info(f"Plotting the modified [raw] dataframe in {self.plotdir}... ")
+            plotdf(df, os.path.join(self.plotdir, f"RawModified_{os.path.basename(self.df_name).split('.')[0]}.pdf"))
+
+                   
+        if self.donorm:
+            logger.info("Normalising df: 1. Numerical feats only, 2. Not any target variables")
+            colsAll = list(df.keys())
+            colsToNorm = self.globalfeats + tau_num_feat_names + tau_cat_feat_names
+            
+            logger.info(f"Keys to normalise: {colsToNorm}")
+            colsNotToNorm = np.setdiff1d(np.array(colsAll), np.array(colsToNorm)).tolist()
+            dfToNorm    = df[colsToNorm]
+            #from IPython import embed; embed()
+            logger.info("Before norm :--> ")
+            logger.info(dfToNorm.head(10))
+            dfNotToNorm = df[colsNotToNorm]
+            #scaler = MinMaxScaler()
+            #dfToNorm = scaler.fit_transform(dfToNorm)
+            dfToNorm = dfToNorm.apply(normalise_column)
+            logger.info("After norm :--> ")
+            logger.info(dfToNorm.head(10))
+            df = pd.concat([dfToNorm, dfNotToNorm], axis=1)
+
+            logger.info("df with all columns [after normalisation] :--> ")
+            #print(list(df.keys()))
+            logger.info(df.head(10))
+        
 
         node_dict = {}
         jet_mask = None
         njets_per_evt = None
-        for i,feat in enumerate(self.nodefeats) :
-            print(f"Node Feature: {feat}")
+        #for i,feat in enumerate(self.nodefeats) :
+        for i,feat in enumerate(allnodefeats) :
+            logger.info(f"Node Feature: {feat}")
             tau_cols = self._col_key_list(feat, 2, "tau")
             #print(f"tau columns: {tau_cols}")
             jet_cols = self._col_key_list(feat, 10, "jet")
@@ -138,24 +194,6 @@ class ZtoTauTauDataset(InMemoryDataset):
             #temp_tau_col_vals = tau_col_vals.flatten()
             #print(np.isnan(temp_tau_col_vals), np.sum(temp_tau_col_vals))
             tau_feats = ak.Array(tau_col_vals)
-            """
-            if i==8: 
-                #print(f"tau: {list(tau_col_vals)}")
-                #print(ak.to_list(tau_feats))
-                #assert not ak.any(ak.isnan(tau_col_vals))
-                print(tau_feats.type, tau_feats[0].type)
-                print(type(tau_feats), type(tau_feats[0]))
-                #temp = np.where(np.isnan(tau_col_vals), 0, np.ones_like(tau_col_vals))
-                #print(list(temp))
-                #assert not np.any(np.isnan(tau_col_vals))
-                #tau_feats_flat = ak.flatten(tau_feats)
-                #print(ak.to_list(tau_feats_flat))
-                #print(tau_feats_flat.type, tau_feats.type)
-                #print(ak.is_none(tau_feats_flat))
-                temp = ak.to_numpy(tau_feats)
-                assert not np.any(np.isnan(temp))
-            """
-            #print(f"tau_feats: {tau_feats}")
 
             jet_col_vals = df[jet_cols].values
             #print(f"jet: {list(jet_col_vals)}")
@@ -177,14 +215,14 @@ class ZtoTauTauDataset(InMemoryDataset):
             
         global_dict = {}
         for feat in self.globalfeats:
-            print(f"Global Feature: {feat}")
+            logger.info(f"Global Feature: {feat}")
             global_feat = ak.Array(df[feat].values)
             global_dict[feat] = global_feat
 
             
         target_dict = {}
         for feat in self.targetfeats:
-            print(f"Target Feature: {feat}")
+            logger.info(f"Target Feature: {feat}")
             #gentaunu_cols = self._col_key_list(feat, 2, "gentaunu")
             #gentaunu_cols = self._col_key_list(feat, 2, None)
             target_feat = ak.Array(df[feat].values)
@@ -194,6 +232,13 @@ class ZtoTauTauDataset(InMemoryDataset):
         #extra_target_col = "phicp"
         #temp_feat = ak.Array(df[extra_target_col].values)
         #target_dict[extra_target_col] = target_feat
+        logger.info(f"Saving the modified dataframe in {self.plotdir} ...")
+        logger.info(self.df_name)
+        df.to_hdf(os.path.join(self.plotdir, f"Modified_{os.path.basename(self.df_name)}"), key='df', mode='w')
+        logger.info(" ... Done")
+        if self.doplot and self.donorm:
+            logger.info(f"Plotting the modified [norm] dataframe in {self.plotdir}... ")
+            plotdf(df, os.path.join(self.plotdir, f"NormModified_{os.path.basename(self.df_name).split('.')[0]}.pdf"))
 
         return (node_dict, global_dict, target_dict)
 
@@ -302,20 +347,22 @@ class ZtoTauTauDataset(InMemoryDataset):
     def process(self):
         from tqdm import tqdm
         from time import sleep
-        print("process called")
-        print(self.raw_paths)
-        print(f"self.raw_paths[0]: {self.raw_paths[0]}")
+        logger.info("process called")
+        logger.info(self.raw_paths)
+        logger.info(f"self.raw_paths[0]: {self.raw_paths[0]}")
         
         #self.df = pd.read_hdf(self.raw_paths[0])
         self.df = pd.read_hdf(self.raw_file_names)
-        print(f"raw data: {self.df}")
+        logger.info(f"raw data: {self.df}")
         #self.df = pd.read_hdf("/pbs/home/g/gsaha/work/TauRegression/GNN/data/raw/GluGluHToTauTauSMdata_00_11.h5")
         zips = self._transform_from_dataframe()
+        #self.df_modified = zips[0]
+
         self.node_record = ak.zip(zips[0])
         self.global_record = ak.zip(zips[1])
         self.target_record = ak.zip(zips[2])
         if self.doplot:
-            print(" ===> Plotting : Start ===> ")
+            logger.info(" ===> Plotting : Start ===> ")
             plotter = PlotUtil(self.node_record, 
                                self.target_record,
                                self.global_record,
@@ -323,17 +370,19 @@ class ZtoTauTauDataset(InMemoryDataset):
             plotter.plot_nodes((40,40))
             plotter.plot_targets((20,12))
             plotter.plot_globals()
-            print(" ===> Plotting : End ===> ")
+            logger.info(" ===> Plotting : End ===> ")
         datalist = []
         for idx in tqdm(range(len(self.df)), ascii=True):
             data = self.transform_to_torch(idx)
             #print(f"iter: {idx} ---> {data}")
             datalist.append(data)
             #sleep(0.01)
+        logger.info(f"Saving the processed PytorchGeometric Dataset in {self.processed_dir} ...")
         self.save(datalist,
-                  os.path.join(self.processed_dir, 
+                  os.path.join(self.processed_dir,
                                self.proc_name))
-        
+        logger.info(" ... Done")
+            
     """
     def len(self):
         df = pd.read_hdf(self.raw_paths[0])

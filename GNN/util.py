@@ -199,22 +199,30 @@ def getp4(out: torch.Tensor, idx: int):
 def plteval(y_true: torch.Tensor, y_pred: torch.Tensor, path: str) -> None:
     plt.figure(figsize=(20,12))
     ntargets = y_true.shape[-1]
+    y_true = y_true.cpu().numpy()
+    y_pred = y_pred.cpu().numpy()
+    print(y_true.shape, y_pred.shape)
     for i in range(ntargets):
         ax = plt.subplot(int(ntargets/3),4,i+1)
         
-        temp_true = y_true[:,i:i+1].cpu().numpy().reshape(-1)
-        temp_pred = y_pred[:,i:i+1].cpu().numpy().reshape(-1)
+        #temp_true = y_true[:,i:i+1].cpu().numpy().reshape(-1)
+        #temp_pred = y_pred[:,i:i+1].cpu().numpy().reshape(-1)
+        temp_true = y_true[:,i:i+1].reshape(-1)
+        temp_pred = y_pred[:,i:i+1].reshape(-1)
         
-        _range = [-50.0,50.0] if i < 6 else [0, 6.5]
+        #_range = [-50.0,50.0] if i < 6 else [-1.2, 1.2]
 
-        ax.hist(temp_true, 100, range=_range, histtype="stepfilled", alpha=0.7, label='True')
-        ax.hist(temp_pred, 100, range=_range, histtype="stepfilled", alpha=0.7, label='Pred')
+        #ax.hist(temp_true, 100, range=_range, histtype="stepfilled", alpha=0.7, label='True')
+        #ax.hist(temp_pred, 100, range=_range, histtype="stepfilled", alpha=0.7, label='Pred')
+        ax.hist(temp_true, 100, histtype="stepfilled", alpha=0.7, label='True')
+        ax.hist(temp_pred, 100, histtype="stepfilled", alpha=0.7, label='Pred')
     #ax.set_title(f"{key}")
     #ax.set_xlabel(f'''{key.split('_')[-1]}''')
     ax.legend()
     plt.tight_layout()
     plt.savefig(os.path.join(path,'output_regressed.png'), dpi=300)
-        
+    return y_pred
+    
 def plteval_v2(y_true: torch.Tensor, y_pred: torch.Tensor, path: str) -> None:
     y_true = y_true.cpu()
     y_pred = y_pred.cpu()
@@ -279,3 +287,25 @@ def plteval_v2(y_true: torch.Tensor, y_pred: torch.Tensor, path: str) -> None:
         ax.legend()
     plt.tight_layout()
     plt.savefig(os.path.join(path,'output_nu_2.png'), dpi=300)
+
+
+def plotdf(df, outf):
+    keys = list(df.keys())
+    nkeys = len(keys)
+    ncols = 10
+    nrows = int(np.ceil(nkeys/10))
+
+    plt.figure(figsize=(4*ncols,2*nrows))
+    for idx, key in enumerate(keys):
+        idx=idx+1
+        ax = plt.subplot(nrows,ncols,idx)
+        arr = df[key]
+        
+        ax.hist(arr, 50, histtype="stepfilled", alpha=0.7, log=False)
+        
+        ax.set_title(f"{key}")
+        ax.set_xlabel(f"{key}")
+        #ax.legend()
+
+    plt.tight_layout()
+    plt.savefig(f'{outf}', dpi=300)

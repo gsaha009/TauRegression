@@ -98,7 +98,7 @@ def ddp_setup_torchrun():
 
 # split dataset
 def dataset_split(dataset: Dataset, frac: float):
-    dataset = dataset.shuffle()
+    #dataset = dataset.shuffle()
     n_total = dataset.len()
 
     n_train = int(np.floor(n_total * frac))
@@ -124,7 +124,7 @@ def prepare_dataloader(dataset: Dataset,
 
     loader = DataLoader(dataset, 
                         batch_size=batch_size,
-                        shuffle=True)
+                        shuffle=False)
     if ddp:
         sampler = DistributedSampler(dataset, shuffle=sampler_shuffle)
         loader = DataLoader(dataset,
@@ -150,3 +150,11 @@ def prepare_dataloaders(train_dataset: Dataset,
 
 def plot_evals(trues, preds):
     pass
+
+
+def normalise_column(column):
+    mask = ((column.max() - column.min()) == 0) | (abs(column).sum() == 0) 
+    if mask:  # Exclude the column with all zeros
+        return column
+    else:
+        return (column - column.min()) / (column.max() - column.min())

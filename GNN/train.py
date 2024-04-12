@@ -1,6 +1,8 @@
 import os
 import time
 from typing import Optional
+import logging
+logger = logging.getLogger('main')
 
 import torch
 import torch.nn as nn
@@ -118,9 +120,9 @@ class Trainer:
         self.lr_scheduler.step(train_loss)
         
         end = float(time.time())
-        print(
-            f"\n[GPU{self.gpu_id}] Epoch {epoch:2d} | Batchsize: {self.h_params.batchlen} | Steps: {len(self.trainloader)} | LR: {LRate:.4f} | Loss: {train_loss:.4f} | R2: {train_acc:.2f} | Val-Loss: {val_loss:.4f} | Val-R2: {val_acc:.2f} | time: {round((end - start)/60,4)} min",
-            flush=True,
+        logger.info(
+            f"\n[GPU{self.gpu_id}] Epoch {epoch:2d} | Batchsize: {self.h_params.batchlen} | Steps: {len(self.trainloader)} | LR: {LRate:.4f} | Loss: {train_loss:.4f} | R2: {train_acc:.2f} | Val-Loss: {val_loss:.4f} | Val-R2: {val_acc:.2f} | time: {round((end - start)/60,4)} min"#,
+            #flush=True,
         )
 
         self.train_acc.reset()
@@ -192,10 +194,34 @@ class Trainer:
                 
                 self.valid_acc.update(out, tgt)
         end = float(time.time())
-        print(
+        logger.info(
             f"[GPU{self.gpu_id}] Test Acc: {100 * self.valid_acc.compute().item():.4f}% ... in {(end-start)/60} mins"
         )
         return trues, preds
+
+
+    def evaluate(self, final_model_path: str, dataloader: DataLoader):
+        #self.model = torch.load(final_model_path, map_location=torch.device('cpu'))
+        self.model.load_state_dict(torch.load(final_model_path))
+        self.model.eval()
+        preds = None
+        trues = None
+        start = float(time.time())
+        with torch.no_grad():
+            for i, batched_data in enumerate(dataloader):
+                src = batched_data.to(self.gpu_id)
+                tgt = batched_data.y.to(self.gpu_id)
+                out = self.model(src)
+                preds = out if i==0 else torch.cat([preds, out])
+                trues = tgt if i==0 else torch.cat([trues, tgt])
+                
+                self.valid_acc.update(out, tgt)
+        end = float(time.time())
+        logger.info(
+            f"[GPU{self.gpu_id}] Test Acc: {100 * self.valid_acc.compute().item():.4f}% ... in {(end-start)/60} mins"
+        )
+        return trues, preds
+
 
 
 from torch.utils.data.distributed import DistributedSampler
@@ -292,14 +318,14 @@ class TrainerDDPtorchrun(TrainerDDP):
             self.model.load_state_dict(snapshot["MODEL_STATE"])
             self.optimizer.load_state_dict(snapshot["OPTIMIZER"])
             self.lr_scheduler.load_state_dict(snapshot["LR_SCHEDULER"])
-            print(
+            logger.info(
                 f"[GPU{self.gpu_id}] Resuming training from snapshot at Epoch {snapshot['EPOCHS']}"
             )
 
         def train(self):
             snapshot_path = f"{self.model_ckptpath}/snapshot.pt"
             if Path(snapshot_path).exists():
-                print("Loading snapshot")
+                logger.info("Loading snapshot")
                 self._load_snapshot(snapshot_path)
                 
             self.model.train()

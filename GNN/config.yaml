@@ -1,19 +1,18 @@
 torch_seed: 12345 # for reproducibility
 
-rawdata_path: /sps/cms/gsaha/TauRegression/GNN_Input
-df_name: GluGluHToTauTauSMdata_norm_11.h5
-procdata_name: data_norm_11.pt
-#inputs:
-  #datapath: /pbs/home/g/gsaha/work/Regression/Input/DY_Cat_20231206_155537
-#  datapath: /pbs/home/g/gsaha/work/TauRegression/Input
-  #node_file: DY_nodes.parquet
-  #target_file: DY_targets.parquet
-  #global_file: DY_globals.parquet
-#  dataframe: GluGluHToTauTauSMdata_norm.h5 
+#rawdata_path: /sps/cms/gsaha/TauRegression/GNN_Input
+rawdata_path: /sps/cms/gsaha/GluGluHToTauTauOutput
+
+#df_name: GluGluHToTauTauSMdata_norm_11.h5
+df_name: GluGluHToTauTauSMdata_ForTrain_Raw_11_simple_IC_20240411_124244.h5
+
+#procdata_name: data_norm_11.pt
+# Raw/Norm will automatially be added
+procdata_name: data_ForTrain_11_simple_IC_20240411_124244.pt
+
 
 # date-time tag will be added after output
 outputpath: /sps/cms/gsaha/TauRegression/GNN_Output/Output
-#outputpath: /pbs/home/g/gsaha/work/TauRegression/Output/Output
 
 train_frac: 0.80
 
@@ -24,13 +23,23 @@ hparamdict:
   momentum: 0.9
   betas: (0.9, 0.999)
   lr_stepsize: 5
-  save_every: 5
+  save_every: 10
 
 # date-time tag will be added after trained models
 modelpath: /sps/cms/gsaha/TauRegression/GNN_Output/TrainedModels
-#modelpath: /pbs/home/g/gsaha/work/TauRegression/Output/TrainedModels
+
+# /sps/cms/gsaha/TauRegression/GNN_Output/TrainedModels_20240327_135206/GNN_single_epoch99.pt
+# /pbs/home/g/gsaha/work/TauRegression/Output/TrainedModels_20231207_160456/GNN_DDP_epoch5.pt
+# /sps/cms/gsaha/TauRegression/GNN_Output/TrainedModels_20240401_015916/GNN_single_epoch99.pt
+final_model_path: /sps/cms/gsaha/TauRegression/GNN_Output/TrainedModels_20240412_092135/GNN_single_epoch70.pt
 
 GPU: single # multi
+
+plot:
+  cmd: True
+
+norm:
+  cmd: False
 
 train:
   cmd: True
@@ -39,59 +48,63 @@ val:
   cmd: True
 
 test:
-  cmd: False
-  #final_model_path: /sps/cms/gsaha/TauRegression/GNN_Output/TrainedModels_20240327_135206/GNN_single_epoch99.pt
-  final_model_path: /sps/cms/gsaha/TauRegression/GNN_Output/TrainedModels_20240401_015916/GNN_single_epoch99.pt
-  #final_model_path: /pbs/home/g/gsaha/work/TauRegression/Output/TrainedModels_20231207_160456/GNN_DDP_epoch5.pt
+  cmd: True
 
 evaluate:
-  cmd: False
-
+  cmd: True
 
 nodetypes:
   - tau
   - jet
-# will be modified with tau_i and jet_i
-nodefeats:
-  - pt
-  - eta
-  - phi
-  - mass
-  - rawIsodR03
-  #- rawMVAnewDM2017v2
-  - leadTkPtOverTauPt
-  - btagPNetB
-  - rawPNetVSe
-  - rawPNetVSjet
-  - rawPNetVSmu
-  - charge_1
-  - charge_-1
-  - decayModePNet_0
-  - decayModePNet_1
-  - decayModePNet_2
-  - decayModePNet_10
-  - decayModePNet_11
-  - probDM0PNet
-  - probDM1PNet
-  - probDM2PNet
-  - probDM10PNet
-  - probDM11PNet
-  - npf
-  - ptfrac
-  - pf_dphi_pt_frac
-  - pf_deta_pt_frac
 
+nodefeats:
+  numerical:
+    - pt
+    - eta
+    - phi
+    - mass
+    - rawIsodR03
+    #- rawMVAnewDM2017v2
+    - leadTkPtOverTauPt
+    - btagPNetB
+    - rawPNetVSe
+    - rawPNetVSjet
+    - rawPNetVSmu
+    - probDM0PNet
+    - probDM1PNet
+    - probDM2PNet
+    - probDM10PNet
+    - probDM11PNet
+    - npf
+    - ptfrac
+    - pf_dphi_pt_frac
+    - pf_deta_pt_frac
+  categorical:
+    - charge_1
+    - charge_-1
+    - decayModePNet_0
+    - decayModePNet_1
+    - decayModePNet_2
+    - decayModePNet_10
+    - decayModePNet_11
 
 targettypes:
   - gentaunu
 targetfeats:
-  #- px_gentaunu_1
-  #- py_gentaunu_1
-  #- pz_gentaunu_1
-  #- px_gentaunu_2
-  #- py_gentaunu_2
-  #- pz_gentaunu_2
-  - phicp
+  - px_gentaunu_1
+  - py_gentaunu_1
+  - pz_gentaunu_1
+  - px_gentaunu_2
+  - py_gentaunu_2
+  - pz_gentaunu_2
+  #- phicp
+  - h1x
+  - h1y
+  - h1z
+  - h2x
+  - h2y
+  - h2z
+
 
 globalfeats:
   - nJet
