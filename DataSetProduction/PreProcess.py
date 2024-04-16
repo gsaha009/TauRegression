@@ -13,6 +13,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import datetime
+import time
 from coffea.nanoevents import NanoEventsFactory, NanoAODSchema
 NanoAODSchema.warn_missing_crossrefs = False
 from coffea.nanoevents.methods import vector
@@ -26,6 +27,32 @@ from EventSelection import SelectEvents
 from ExtractFeatures import FeatureExtraction
 
 
+import logging
+def setup_logger(log_file):
+    # Create a logger
+    logger = logging.getLogger('main')
+    logger.setLevel(logging.DEBUG)
+
+    # Create a file handler
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setLevel(logging.DEBUG)
+
+    # Create a console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+
+    # Create a formatter and add it to the file handler
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    file_handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+
+    # Add the file handler to the logger
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+
+    return logger
+
+
 # ----------------------------------------------------------------------------------------------------- #
 #                                            main script                                                #
 # ----------------------------------------------------------------------------------------------------- #
@@ -37,7 +64,7 @@ def get_features_df(events, tau1dm, tau2dm, isForTrain, howtogetpizero, isnorm):
                                   isForTrain = isForTrain,
                                   howtogetpizero = howtogetpizero)
 
-    sel_evt_dict = sel_evt_object.apply_selections()
+    sel_evt_dict, cut_flow_dict = sel_evt_object.apply_selections()
 
     feat_extract_object = FeatureExtraction(sel_evt_dict["events"],
                                             sel_evt_dict["det_taus"],
@@ -57,12 +84,14 @@ def get_features_df(events, tau1dm, tau2dm, isForTrain, howtogetpizero, isnorm):
 
     df = pd.DataFrame(all_feats, columns=all_keys)
 
-    return df
+    return df, cut_flow_dict
 
 
 
 def main():
+    start = float(time.time())
     datetime_tag = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    logger = setup_logger(os.path.join("logs", f"Runlog_{datetime_tag}.log"))
     parser = argparse.ArgumentParser(description='Pre-Processing')
     parser.add_argument('-t',
                         '--tag',
@@ -90,32 +119,35 @@ def main():
     
 
     events_df = None
+    events_cutflow = None
     events_dict = {}
     
     for index, fname in enumerate(infiles):
-        print(f"\nFile idx: {index} --- File name: {fname}")
+        logger.info(f"\nFile idx: {index} --- File name: {fname}")
         #if (index > 0): continue
         assert os.path.exists(fname), f"{fname} doesnt exist"
 
         infile = uproot.open(fname)
         tree = infile['Events']
         events = NanoEventsFactory.from_root(fname).events()
-        print(f"nEvents: {ak.num(events.event, axis=0)}")
-        print(f"Event Fields: {events.fields}")
+        logger.info(f"nEvents: {ak.num(events.event, axis=0)}")
+        logger.info(f"Event Fields: {events.fields}")
 
-        df = get_features_df(events, tau1dm, tau2dm, isForTrain, howtogetpizero, isnorm)
+        df, cut_flow_dict = get_features_df(events, tau1dm, tau2dm, isForTrain, howtogetpizero, isnorm)
 
         if index == 0:
             #from IPython import embed; embed()
             events_df = df
+            events_cutflow = cut_flow_dict
         else:
             events_df = pd.concat([events_df, df])
+            events_cutflow = add_dict(events_cutflow, cut_flow_dict)
 
     #from IPython import embed; embed()
-    print(list(events_df.keys()))
-    print(events_df.head(10))
+    logger.info(list(events_df.keys()))
+    logger.info(f"df: \n{events_df.head(10)}")
 
-    print(f"nEntries: {events_df.shape}")
+    logger.info(f"nEntries: {events_df.shape}")
     _item_1 = "ForTrain" if isForTrain else "ForEval"
     _item_2 = "Norm" if isnorm else "Raw"
     _item_3 = f"{tau1dm}{tau2dm}"
@@ -125,11 +157,14 @@ def main():
     pltname = os.path.join(outdir, f"{_name}.pdf")
     h5name  = os.path.join(outdir, f"{_name}.h5")
 
-    print("plotting df features ===> ")
+    logger.info("plotting df features ===> ")
     plotdf(events_df, pltname)
-    print("saving dataframe ===>")
+    logger.info("saving dataframe ===>")
     events_df.to_hdf(h5name, key='df', mode='w')
-    print("DONE")
+    end = float(time.time())
+    logger.info("cumulative cutflow ===>")
+    SelectEvents.print_cutflow(events_cutflow)
+    logger.info(f"DONE in {round((end - start)/60.0, 3)} minutes")
 
 if __name__=="__main__":
     main()

@@ -10,7 +10,6 @@ df_name: GluGluHToTauTauSMdata_ForTrain_Raw_11_simple_IC_20240411_124244.h5
 # Raw/Norm will automatially be added
 procdata_name: data_ForTrain_11_simple_IC_20240411_124244.pt
 
-
 # date-time tag will be added after output
 outputpath: /sps/cms/gsaha/TauRegression/GNN_Output/Output
 
@@ -39,7 +38,7 @@ plot:
   cmd: True
 
 norm:
-  cmd: False
+  cmd: True
 
 train:
   cmd: True

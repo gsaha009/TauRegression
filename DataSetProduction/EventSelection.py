@@ -21,6 +21,8 @@ import itertools
 from prettytable import PrettyTable
 from typing import Optional
 from PhiCPComp import PhiCPComp
+import logging
+logger = logging.getLogger('main')
 from util import *
 
 
@@ -69,7 +71,7 @@ class SelectEvents:
                 "muon_selection: no_muon": ak.num(sel_muo_indices, axis=1) == 0
             },
         }
-        print("muon selection done")
+        logger.info("muon selection done")
         return SelectionResult, sel_muo_indices
 
     
@@ -93,7 +95,7 @@ class SelectEvents:
                 "electron_selection: no_electron": ak.num(sel_ele_indices, axis=1) == 0
             },
         }
-        print("electron selection done")
+        logger.info("electron selection done")
         return SelectionResult, sel_ele_indices
 
     
@@ -142,7 +144,7 @@ class SelectEvents:
                 "tau_selection: closest to gentaus": two_taus_closest_gentaus_evt_mask,
             },
         }
-        print("tau selection done")
+        logger.info("tau selection done")
         return SelectionResult, sel_tau_indices
 
 
@@ -172,7 +174,7 @@ class SelectEvents:
         SelectionResult = {
             "steps": {},
         }
-        print("jet selection done")
+        logger.info("jet selection done")
         return SelectionResult, sel_jet_indices
 
 
@@ -205,7 +207,7 @@ class SelectEvents:
                 "gentau_selection: two moms are h": (ak.num(gentau_momidx, axis=1) == 2),
             },
         }
-        print("gentaus and products selection done")
+        logger.info("gentaus and products selection done: gonna be used if isForTrain = True")
         return SelectionResult, gentau, gentau_children
 
 
@@ -269,8 +271,6 @@ class SelectEvents:
         if self.tau1dm == 1 and self.tau2dm == 1:
             evt_mask_1 = ak.sum((has_one_pion & has_atleast_one_gamma), axis=1) >= 2
             if self.isForTrain:
-                #if self.tau1dm == 1 and self.tau2dm == 1:
-                #evt_mask_1 = 
                 one_prong = (gentaus.DM == 1)
                 evt_mask_2 = ak.sum(one_prong, axis=1) == 2
 
@@ -459,7 +459,7 @@ class SelectEvents:
                                       "det_pizeros": pizeros_p4}
         # save nPions and nPhotons later :: MUST
         
-        print("tau prods selection done")
+        logger.info("tau prods selection done")
         return tauprod_results, new_events_dict
 
     
@@ -504,10 +504,12 @@ class SelectEvents:
         # an extra selection based on tau decay products
         tauprod_results, evt_dict = self.prod_selection(evt_dict, sel_tau_indices)
 
-        evt_mask = np.abs(events.event) >= 0
+        #evt_mask = np.abs(events.event) >= 0
+        evt_mask = np.abs(evt_dict["events"].event) >= 0
         for key, val in tauprod_results["steps"].items():
             evt_mask = evt_mask & val
-            evt_cut_flow[key] = ak.sum(val)
+            #evt_cut_flow[key] = ak.sum(val)
+            evt_cut_flow[key] = ak.sum(evt_mask)
             
         evt_dict = self.apply_evt_mask(evt_dict, evt_mask)
         
@@ -515,27 +517,27 @@ class SelectEvents:
         self.inspect(evt_dict)
         
         #from IPython import embed; embed()
-        return evt_dict
+        return evt_dict, evt_cut_flow
 
     
 
     def apply_evt_mask(self, evt_dict, evt_mask):
         return {key: val[evt_mask] for key, val in evt_dict.items()}
 
-
-    def print_cutflow(self, event_cut_flow):
+    @staticmethod
+    def print_cutflow(event_cut_flow):
         x = PrettyTable()
         x.field_names = ["Selections", "nEvents Selected"]
         for key, val in event_cut_flow.items():
             x.add_row([key, val])
-        print(x)
+        logger.info(str(x))
         
 
     def inspect(self, evt_dict):
         x = PrettyTable()
         x.field_names = ["Field", "Array"]
-        print(" ===> Inspecting event dict ===> ")
+        logger.info(" ===> Inspecting event dict ===> ")
         fields = evt_dict.keys()
         for key, val in evt_dict.items():
             x.add_row([key, type(val)])
-        print(x)
+        logger.info(str(x))

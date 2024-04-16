@@ -358,3 +358,6 @@ def getMaxPhiTauStrip(pt):
     ref2 = ak.where(ref1 > 0.05, ref1, 0.05)
     return ref2
 
+def add_dict(dict1, dict2):
+    return {key: val1 + list(dict2.values())[i] for i, (key, val1) in enumerate(dict1.items())}
+

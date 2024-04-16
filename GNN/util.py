@@ -58,8 +58,8 @@ class PlotUtil:
         for field in target_feats:
             print(f"{field} : \t{self.target_record[field]}")
         print(f"target feats: {target_feats}")
-        nrows = 1#len(target_feats)
-        ncols = 1#ak.max(ak.num(self.target_record[target_feats[0]], axis=1))
+        nrows = len(target_feats)
+        ncols = ak.max(ak.num(self.target_record[target_feats[0]], axis=1))
         
         fig, ax = plt.subplots(nrows,ncols,figsize=(size[0],size[1]))
         #plt.subplots_adjust(left    = 0.1,
@@ -69,7 +69,6 @@ class PlotUtil:
         #                    hspace  = 0.5,
         #                    wspace  = 0.4)
 
-        """
         for irow, feat in enumerate(target_feats):
             feat_arr = self.target_record[feat]
             #print(f"{feat}: {feat_arr}")
@@ -86,7 +85,7 @@ class PlotUtil:
         #ax[2,0].hist(self.target_record[target_feats[4]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[4]}')
         #ax[2,1].hist(self.target_record[target_feats[5]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[5]}')
         #ax[3,0].hist(self.target_record[target_feats[6]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[6]}')
-
+        """
 
         plt.tight_layout()
         plt.savefig(f"{self.outdir}/target_feats.png", dpi=350)
@@ -111,6 +110,10 @@ class PlotUtil:
         plt.tight_layout()
         plt.savefig(f"{self.outdir}/global_feats.png", dpi=350)
         #return plt
+
+
+
+
 
 def plothistory(history: dict, outdir: str) -> None:
     x_left  = list(range(len(history.batch.loss)))

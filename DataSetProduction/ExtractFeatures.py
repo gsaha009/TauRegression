@@ -18,6 +18,8 @@ from typing import Optional
 from util import *
 from PhiCPComp import PhiCPComp
 
+import logging
+logger = logging.getLogger('main')
 
 
 class FeatureExtraction:
@@ -136,8 +138,8 @@ class FeatureExtraction:
             maxidx = 15
 
         keys, feats = self.get_feats_per_obj(objs, featlist, maxidx, tag)
-        print(f"Total node feats: {len(keys)}")
-        print(f"Node feat shape: {feats.shape}")
+        logger.info(f"Total node feats: {len(keys)}")
+        logger.info(f"Node feat shape: {feats.shape}")
         
         return feats, keys
 
@@ -176,26 +178,26 @@ class FeatureExtraction:
         for idx in range(maxidx):
             #key = f"{tag}_{idx+1}"
             key = f"{feat}_{tag}_{idx+1}"
-            print(key)
+            logger.info(key)
             temp = ak.to_numpy(ak.fill_none(ak.firsts(arr[:, idx : idx+1], axis=1), 0.0))
             #temp = ak.to_numpy(ak.fill_none(ak.firsts(arr[:, idx : idx+1], axis=1), 0.0))[:,None]
             #temp = temp[:,None]
             if iscat:
-                print("categorical ---> ")
-                print("first adding the original one ===> ")
+                logger.info("categorical ---> ")
+                logger.info("first adding the original one ===> ")
                 #temp = temp[:,None]
                 #keylist.append(key)
                 npones  = np.ones_like(temp)
                 npzeros = np.zeros_like(temp)
                 #uniques = np.unique(temp)
                 uniques = np.array(_uniques[feat])
-                print(f"\tuniques: {uniques}")
+                logger.info(f"\tuniques: {uniques}")
                 catarray = None
                 keylist.append(key)
                 for i, val in enumerate(uniques):
                     #_key = f"{tag}_{val}_{idx+1}"
                     _key = f"{feat}_{int(val)}_{tag}_{idx+1}"
-                    print(f"\t{_key}")
+                    logger.info(f"\t{_key}")
                     keylist.append(_key)
                     tempcatarray = np.where(temp == val, npones, npzeros)[:,None]
                     #print(f"\t{tempcatarray}")
@@ -278,8 +280,8 @@ class FeatureExtraction:
 
         #data  = pd.DataFrame(global_np, columns=global_feats)
         #return data
-        print(f"Total global feats: {len(global_feats)}")
-        print(f"Global feat shape: {global_np.shape}")
+        logger.info(f"Total global feats: {len(global_feats)}")
+        logger.info(f"Global feat shape: {global_np.shape}")
         return global_np, global_feats
 
 
@@ -319,15 +321,15 @@ class FeatureExtraction:
                            "px_gentaunu_1", "py_gentaunu_1", "pz_gentaunu_1", 
                            "px_gentaunu_2", "py_gentaunu_2", "pz_gentaunu_2"]
             
-        print(f"Total target feats: {len(target_keys)}")
-        print(f"Target feat shape: {np_target_feats.shape}")
+        logger.info(f"Total target feats: {len(target_keys)}")
+        logger.info(f"Target feat shape: {np_target_feats.shape}")
         
         return np_target_feats, target_keys
 
 
     # keep it flexible so that it can be called from outside
     def extrafeats(self, tau1dm, tau2dm, pions, pizeros):
-        print(" --- Saving extra feats >>>")
+        logger.info(" --- Saving extra feats >>>")
         _tauprods = ak.concatenate([pions,pizeros], axis=-1)
 
 
@@ -440,8 +442,8 @@ class FeatureExtraction:
             phi_cp_gen_det    = ak.firsts(phi_cp_gen_det, axis=1)
             
             
-            print(f"phi_cp_gen      : {phi_cp_gen}")
-            print(f"phi_cp (gen_det): {phi_cp_gen_det}")
+            logger.info(f"phi_cp_gen      : {phi_cp_gen}")
+            logger.info(f"phi_cp (gen_det): {phi_cp_gen_det}")
             
             
             new_extra_feats = ak.concatenate([phi_cp_gen, phi_cp_gen_det,
@@ -458,7 +460,7 @@ class FeatureExtraction:
 
         np_extra_feats = ak.to_numpy(extra_feats)
 
-        print(f"extra    : {np_extra_feats.shape}, {len(extra_keys)}")
+        logger.info(f"extra    : {np_extra_feats.shape}, {len(extra_keys)}")
         return np_extra_feats, extra_keys
 
 
@@ -472,12 +474,12 @@ class FeatureExtraction:
         np_target_feats, target_keys = self.gettargets()
 
 
-        print("details: ===>")
-        print(f"manual   : {np_manual_node_feats.shape}, {len(manual_node_keys)}")
-        print(f"node_tau : {np_tau_node_feats.shape}, {len(tau_node_keys)}")
-        print(f"node_jet : {np_jet_node_feats.shape}, {len(jet_node_keys)}")
-        print(f"global   : {np_global_feats.shape}, {len(global_keys)}")
-        print(f"target   : {np_target_feats.shape}, {len(target_keys)}")
+        logger.info("details: ===>")
+        logger.info(f"manual   : {np_manual_node_feats.shape}, {len(manual_node_keys)}")
+        logger.info(f"node_tau : {np_tau_node_feats.shape}, {len(tau_node_keys)}")
+        logger.info(f"node_jet : {np_jet_node_feats.shape}, {len(jet_node_keys)}")
+        logger.info(f"global   : {np_global_feats.shape}, {len(global_keys)}")
+        logger.info(f"target   : {np_target_feats.shape}, {len(target_keys)}")
 
         all_feats = np.concatenate((np_manual_node_feats, 
                                     np_tau_node_feats,

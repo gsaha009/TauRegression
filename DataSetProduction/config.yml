@@ -1,9 +1,8 @@
 ## Config for GNN
-
 indir:
-  #- /Volumes/WorkExtHDD/DY_NanoAOD_v10/DYJetsToLL_M-50-madgraphMLM
-  #- /Volumes/WorkExtHDD/DY_NanoAOD_v10/DYJetsToLL_M-50-madgraphMLM_ext1
-  - /sps/cms/gsaha/GluGluHToTauTau_M125
+  - /sps/cms/gsaha/GluGluHToTauTau_M125_2016
+  - /sps/cms/gsaha/GluGluHToTauTau_M125_2017
+  - /sps/cms/gsaha/GluGluHToTauTau_M125_2018
 
 outdir: /sps/cms/gsaha/GluGluHToTauTauOutput
   
@@ -14,4 +13,4 @@ tau2dm: 1
 
 isForTrain: True
 
-howtogetpizero: simple_IC
+howtogetpizero: simple_MB
