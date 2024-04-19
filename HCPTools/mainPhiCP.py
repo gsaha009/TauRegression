@@ -12,8 +12,10 @@ import datetime
 
 datetime_tag = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-OD = "/sps/cms/gsaha/TauRegression/GNN_Output/Output_20240412_104117/Modified_GluGluHToTauTauSMdata_ForTrain_Raw_11_simple_IC_20240411_124244.h5"
-PD = "/sps/cms/gsaha/TauRegression/GNN_Output/Output_20240412_111918/ypreds_20240412_111918.h5"
+#OD = "/sps/cms/gsaha/TauRegression/GNN_Output/Output_20240412_104117/Modified_GluGluHToTauTauSMdata_ForTrain_Raw_11_simple_IC_20240411_124244.h5"
+#PD = "/sps/cms/gsaha/TauRegression/GNN_Output/Output_20240412_111918/ypreds_20240412_111918.h5"
+OD = "/sps/cms/gsaha/TauRegression/GNN_Output/Output_20240417_062630/Modified_GluGluHToTauTauSMdata_ForTrain_Raw_11_simple_IC_20240416_133720.h5"
+PD = "/sps/cms/gsaha/TauRegression/GNN_Output/Output_20240417_062630/ypreds_20240417_110203.h5"
 
 outdir = os.path.dirname(PD)
 

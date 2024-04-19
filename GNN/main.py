@@ -254,7 +254,7 @@ def main(configfile: str):
         #                      dovalidate=doval)
         trues, preds = nnTrainer.evaluate(final_model_path, eval_loader)
         logger.info(f"true targets : {trues}")
-        logger.info(f"true targets : {preds}")
+        logger.info(f"pred targets : {preds}")
         np_y_pred = plteval(trues, preds, outdir)
         plteval_v2(trues, preds, outdir)
         logger.info("Getting the modified dataframe ... ")

@@ -20,6 +20,8 @@ from tqdm.notebook import tqdm
 import itertools
 from prettytable import PrettyTable
 from typing import Optional
+from IPython import embed
+
 from PhiCPComp import PhiCPComp
 import logging
 logger = logging.getLogger('main')
@@ -183,7 +185,7 @@ class SelectEvents:
         GenPart = self.events.GenPart
         # masks to select gen tau+ and tau-
         isgentau = ((np.abs(GenPart.pdgId) == 15)
-                    & (GenPart.hasFlags(["isPrompt","isLastCopy"]))
+                    & (GenPart.hasFlags(["isPrompt","isFirstCopy"]))
                     & (GenPart.status == 2)
                     & (GenPart.pt >= 10)
                     & (np.abs(GenPart.eta) <= 2.3))
@@ -199,7 +201,8 @@ class SelectEvents:
         # get tau products
         gentau_children = gentau.distinctChildren
         
-        
+        #embed()
+        #1/0
         SelectionResult = {
             "steps": {
                 "gentau_selection: has 2 gentau": (ak.num(gentau.pdgId, axis=1) == 2),

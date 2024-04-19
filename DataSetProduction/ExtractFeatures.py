@@ -302,6 +302,13 @@ class FeatureExtraction:
             gentau_2_px = ak.to_numpy(ak.fill_none(ak.firsts(gentaus[:,1:2].px, axis=1), 0.0))[:,None]
             gentau_2_py = ak.to_numpy(ak.fill_none(ak.firsts(gentaus[:,1:2].py, axis=1), 0.0))[:,None]
             gentau_2_pz = ak.to_numpy(ak.fill_none(ak.firsts(gentaus[:,1:2].pz, axis=1), 0.0))[:,None]
+
+            gentau_1_pt  = ak.to_numpy(ak.fill_none(ak.firsts(gentaus[:,:1].pt, axis=1), 0.0))[:,None]
+            gentau_1_eta = ak.to_numpy(ak.fill_none(ak.firsts(gentaus[:,:1].eta, axis=1), 0.0))[:,None]
+            gentau_1_phi = ak.to_numpy(ak.fill_none(ak.firsts(gentaus[:,:1].phi, axis=1), 0.0))[:,None]
+            gentau_2_pt  = ak.to_numpy(ak.fill_none(ak.firsts(gentaus[:,1:2].pt, axis=1), 0.0))[:,None]
+            gentau_2_eta = ak.to_numpy(ak.fill_none(ak.firsts(gentaus[:,1:2].eta, axis=1), 0.0))[:,None]
+            gentau_2_phi = ak.to_numpy(ak.fill_none(ak.firsts(gentaus[:,1:2].phi, axis=1), 0.0))[:,None]
             
             gentaunu_1_px = ak.to_numpy(ak.fill_none(ak.firsts(gentaunus[:,:1].px, axis=1), 0.0))
             gentaunu_1_py = ak.to_numpy(ak.fill_none(ak.firsts(gentaunus[:,:1].py, axis=1), 0.0))
@@ -310,16 +317,31 @@ class FeatureExtraction:
             gentaunu_2_py = ak.to_numpy(ak.fill_none(ak.firsts(gentaunus[:,1:2].py, axis=1), 0.0))
             gentaunu_2_pz = ak.to_numpy(ak.fill_none(ak.firsts(gentaunus[:,1:2].pz, axis=1), 0.0))
 
+            gentaunu_1_pt  = ak.to_numpy(ak.fill_none(ak.firsts(gentaunus[:,:1].pt, axis=1), 0.0))
+            gentaunu_1_eta = ak.to_numpy(ak.fill_none(ak.firsts(gentaunus[:,:1].eta, axis=1), 0.0))
+            gentaunu_1_phi = ak.to_numpy(ak.fill_none(ak.firsts(gentaunus[:,:1].phi, axis=1), 0.0))
+            gentaunu_2_pt  = ak.to_numpy(ak.fill_none(ak.firsts(gentaunus[:,1:2].pt, axis=1), 0.0))
+            gentaunu_2_eta = ak.to_numpy(ak.fill_none(ak.firsts(gentaunus[:,1:2].eta, axis=1), 0.0))
+            gentaunu_2_phi = ak.to_numpy(ak.fill_none(ak.firsts(gentaunus[:,1:2].phi, axis=1), 0.0))
+
             #from IPython import embed; embed()
             
-            np_target_feats = np.concatenate((gentau_1_px, gentau_1_py, gentau_1_pz, 
+            np_target_feats = np.concatenate((gentau_1_px, gentau_1_py, gentau_1_pz,
                                               gentau_2_px, gentau_2_py, gentau_2_pz,
-                                              gentaunu_1_px, gentaunu_1_py, gentaunu_1_pz, 
-                                              gentaunu_2_px, gentaunu_2_py, gentaunu_2_pz), axis=1)
+                                              gentau_1_pt, gentau_1_eta, gentau_1_phi,
+                                              gentau_2_pt, gentau_2_eta, gentau_2_phi,
+                                              gentaunu_1_px, gentaunu_1_py, gentaunu_1_pz,
+                                              gentaunu_2_px, gentaunu_2_py, gentaunu_2_pz,
+                                              gentaunu_1_pt, gentaunu_1_eta, gentaunu_1_phi, 
+                                              gentaunu_2_pt, gentaunu_2_eta, gentaunu_2_phi), axis=1)
             target_keys = ["px_gentau_1", "py_gentau_1", "pz_gentau_1", 
                            "px_gentau_2", "py_gentau_2", "pz_gentau_2",
+                           "pt_gentau_1", "eta_gentau_1", "phi_gentau_1",
+                           "pt_gentau_2", "eta_gentau_2", "phi_gentau_2",
                            "px_gentaunu_1", "py_gentaunu_1", "pz_gentaunu_1", 
-                           "px_gentaunu_2", "py_gentaunu_2", "pz_gentaunu_2"]
+                           "px_gentaunu_2", "py_gentaunu_2", "pz_gentaunu_2",
+                           "pt_gentaunu_1", "eta_gentaunu_1", "phi_gentaunu_1", 
+                           "pt_gentaunu_2", "eta_gentaunu_2", "phi_gentaunu_2"]
             
         logger.info(f"Total target feats: {len(target_keys)}")
         logger.info(f"Target feat shape: {np_target_feats.shape}")

@@ -6,6 +6,10 @@ import seaborn as sns
 from prettytable import PrettyTable
 import vector
 import torch
+import logging
+logger = logging.getLogger('main')
+
+
 
 class obj(object):
     def __init__(self, d):
@@ -29,20 +33,14 @@ class PlotUtil:
         
     def plot_nodes(self, size: tuple):
         node_feats = self.node_record.fields
-        print(f"node feats: {node_feats}")
+        logger.info(f"node feats: {node_feats}")
         nrows = len(node_feats)
         ncols = ak.max(ak.num(self.node_record[node_feats[0]], axis=1))
         
         fig, ax = plt.subplots(nrows,ncols,figsize=(size[0],size[1]))
-        #plt.subplots_adjust(left    = 0.1,
-        #                    right   = 0.6,
-        #                    top     = 0.9,
-        #                    bottom  = 0.1,
-        #                    hspace  = 0.5,
-        #                    wspace  = 0.4)
         for irow, feat in enumerate(node_feats):
             feat_arr = self.node_record[feat]
-            #print(f"{feat}: {feat_arr}")
+            logger.info(f"{feat}: {feat_arr}")
             for icol in range(ncols):
                 temp = ak.ravel(feat_arr[:,icol:icol+1]).to_numpy()
                 #print(temp)
@@ -56,35 +54,36 @@ class PlotUtil:
     def plot_targets(self, size: tuple):
         target_feats = self.target_record.fields
         for field in target_feats:
-            print(f"{field} : \t{self.target_record[field]}")
-        print(f"target feats: {target_feats}")
-        nrows = len(target_feats)
-        ncols = ak.max(ak.num(self.target_record[target_feats[0]], axis=1))
-        
+            logger.info(f"{field} : \t{self.target_record[field]}")
+        logger.info(f"target feats: {target_feats}")
+        ncols = 3 #ak.max(ak.num(self.target_record[target_feats[0]], axis=1))
+        nrows = 2 #int(np.ceil(len(target_feats)/ncols))
+        #from IPython import embed; embed()
+        logger.info(f"nrows: {nrows}, ncols: {ncols}")
         fig, ax = plt.subplots(nrows,ncols,figsize=(size[0],size[1]))
-        #plt.subplots_adjust(left    = 0.1,
-        #                    right   = 0.6,
-        #                    top     = 0.9,
-        #                    bottom  = 0.1,
-        #                    hspace  = 0.5,
-        #                    wspace  = 0.4)
-
-        for irow, feat in enumerate(target_feats):
-            feat_arr = self.target_record[feat]
-            #print(f"{feat}: {feat_arr}")
+        
+        #for irow, feat in enumerate(target_feats):
+        idx = 0
+        for irow in range(nrows):
             for icol in range(ncols):
-                temp = ak.ravel(feat_arr[:,icol:icol+1]).to_numpy()
+                feat = target_feats[idx]
+                feat_arr = self.target_record[feat]
+                logger.info(f"{feat}: {feat_arr}")
+                #for icol in range(ncols):
+                #temp = ak.ravel(feat_arr[:,icol:icol+1]).to_numpy()
+                temp = ak.ravel(feat_arr).to_numpy()
                 #print(temp)
                 ax[irow,icol].hist(temp, bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{feat}_{icol+1}')
                 ax[irow,icol].legend()
+                idx += 1
         """
-        ax.hist(self.target_record[target_feats[0]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[0]}')
-        #ax[0,1].hist(self.target_record[target_feats[1]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[1]}')
-        #ax[1,0].hist(self.target_record[target_feats[2]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[2]}')
-        #ax[1,1].hist(self.target_record[target_feats[3]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[3]}')
-        #ax[2,0].hist(self.target_record[target_feats[4]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[4]}')
-        #ax[2,1].hist(self.target_record[target_feats[5]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[5]}')
-        #ax[3,0].hist(self.target_record[target_feats[6]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[6]}')
+        #ax[0,1].hist(self.target_record[target_feats[0]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[0]}')
+        ax[0,0].hist(self.target_record[target_feats[0]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[1]}')
+        ax[0,1].hist(self.target_record[target_feats[1]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[2]}')
+        ax[0,2].hist(self.target_record[target_feats[2]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[3]}')
+        ax[1,0].hist(self.target_record[target_feats[3]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[4]}')
+        ax[1,1].hist(self.target_record[target_feats[4]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[5]}')
+        ax[1,2].hist(self.target_record[target_feats[5]], bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{target_feats[6]}')
         """
 
         plt.tight_layout()
@@ -102,16 +101,13 @@ class PlotUtil:
         for idx, feat in enumerate(global_feats):
             ax = plt.subplot(nrows,ncols,idx+1)
             feat_arr = self.global_record[feat]
-            #print(f"{feat}: {feat_arr}")
+            logger.info(f"{feat}: {feat_arr}")
             temp = ak.ravel(feat_arr).to_numpy()
-            #print(temp)
             ax.hist(temp, bins=100, log=True, histtype="stepfilled", alpha=0.7, label=f'{feat}')
             ax.legend()
         plt.tight_layout()
         plt.savefig(f"{self.outdir}/global_feats.png", dpi=350)
         #return plt
-
-
 
 
 
@@ -174,9 +170,9 @@ def count_model_params(model):
         params = parameter.numel()
         table.add_row([name, params])
         total_params += params
-    print(table)
-    print(f"Total Trainable Params: {total_params}")
-    print(f"Total Non-Trainable Params: {total_nontr_params}")
+    logger.info(str(table))
+    logger.info(f"Total Trainable Params: {total_params}")
+    logger.info(f"Total Non-Trainable Params: {total_nontr_params}")
     return total_params
 
 def getE(px: np.array, py:np.array, pz:np.array)->np.array:
@@ -204,6 +200,7 @@ def plteval(y_true: torch.Tensor, y_pred: torch.Tensor, path: str) -> None:
     ntargets = y_true.shape[-1]
     y_true = y_true.cpu().numpy()
     y_pred = y_pred.cpu().numpy()
+    logger.info(f"{y_true.shape}, {y_pred.shape}")
     print(y_true.shape, y_pred.shape)
     for i in range(ntargets):
         ax = plt.subplot(int(ntargets/3),4,i+1)

@@ -22,7 +22,7 @@ import torch.nn.functional as F
 # raw node features are embedded into 2x dimensional embedding                         #
 # ------------------------------------------------------------------------------------ #
 class GATConvBlock(torch.nn.Module):
-    def __init__(self, dim_in: int, dim_h: int, dim_out: int, heads: int = 2):
+    def __init__(self, dim_in: int, dim_h: int, dim_out: int, heads: int = 5):
         super(GATConvBlock, self).__init__()
         
         self.gat1 = GATConv(dim_in, dim_h, heads=heads)
@@ -126,11 +126,10 @@ class NuNet(torch.nn.Module):
 
         self.num_edge_conv_blocks = 2
         
-        self.kernel_sizes = [2*self.node_feat_size, 128, 128]
+        self.kernel_sizes = [2*self.node_feat_size, 256, 256]
         #self.kernel_sizes = [2*self.node_feat_size, 32, 64]
         self.input_sizes = np.cumsum(self.kernel_sizes)
-        #self.fc_size = 256
-        self.fc_size = 128
+        self.fc_size = 256
 
         if dropout:
             self.dropout = 0.2
@@ -180,14 +179,3 @@ class NuNet(torch.nn.Module):
         x = self.fc2(x)
         
         return x
-
-'''
-def get_model_kwargs():
-    return {
-        "node_feat_size": 11,
-        "global_feat_size": 4,
-        "num_classes": 1,
-        "depth": 2,
-        "dropout": True
-    }
-'''

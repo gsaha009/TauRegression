@@ -1,8 +1,9 @@
 ## Config for GNN
 indir:
-  - /sps/cms/gsaha/GluGluHToTauTau_M125_2016
-  - /sps/cms/gsaha/GluGluHToTauTau_M125_2017
-  - /sps/cms/gsaha/GluGluHToTauTau_M125_2018
+  - /sps/cms/gsaha/GluGluHToTauTau_UncorrelatedDecay_CPodd_Filtered
+  #- /sps/cms/gsaha/GluGluHToTauTau_M125_2016
+  #- /sps/cms/gsaha/GluGluHToTauTau_M125_2017
+  #- /sps/cms/gsaha/GluGluHToTauTau_M125_2018
 
 outdir: /sps/cms/gsaha/GluGluHToTauTauOutput
   
@@ -13,4 +14,4 @@ tau2dm: 1
 
 isForTrain: True
 
-howtogetpizero: simple_MB
+howtogetpizero: simple_IC

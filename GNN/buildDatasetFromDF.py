@@ -209,7 +209,7 @@ class ZtoTauTauDataset(InMemoryDataset):
             #jet_feats = ak.unflatten(ak.flatten(jet_feats), njets_per_evt)
             #print(f"jet feats after masking: {jet_feats}")
             node_feats = ak.concatenate([tau_feats, jet_feats], axis=1)
-            #print(f"node_feats: {node_feats}")
+            logger.info(f"{feat}\t\t --> {node_feats}")
             node_dict[feat] = node_feats
             
             
@@ -217,6 +217,7 @@ class ZtoTauTauDataset(InMemoryDataset):
         for feat in self.globalfeats:
             logger.info(f"Global Feature: {feat}")
             global_feat = ak.Array(df[feat].values)
+            logger.info(f"{feat}\t\t --> {global_feat}")
             global_dict[feat] = global_feat
 
             
@@ -226,7 +227,7 @@ class ZtoTauTauDataset(InMemoryDataset):
             #gentaunu_cols = self._col_key_list(feat, 2, "gentaunu")
             #gentaunu_cols = self._col_key_list(feat, 2, None)
             target_feat = ak.Array(df[feat].values)
-
+            logger.info(f"{feat}\t\t --> {target_feat}")
             target_dict[feat] = target_feat
 
         #extra_target_col = "phicp"
@@ -368,7 +369,7 @@ class ZtoTauTauDataset(InMemoryDataset):
                                self.global_record,
                                self.plotdir)
             plotter.plot_nodes((40,40))
-            plotter.plot_targets((20,12))
+            plotter.plot_targets((30,12))
             plotter.plot_globals()
             logger.info(" ===> Plotting : End ===> ")
         datalist = []
