@@ -1,7 +1,7 @@
 ## Config for GNN
 indir:
-  - /sps/cms/gsaha/GluGluHToTauTau_UncorrelatedDecay_CPodd_Filtered
-  #- /sps/cms/gsaha/GluGluHToTauTau_M125_2016
+  #- /sps/cms/gsaha/GluGluHToTauTau_UncorrelatedDecay_CPodd_Filtered
+  - /sps/cms/gsaha/GluGluHToTauTau_M125_2016
   #- /sps/cms/gsaha/GluGluHToTauTau_M125_2017
   #- /sps/cms/gsaha/GluGluHToTauTau_M125_2018
 
@@ -15,3 +15,50 @@ tau2dm: 1
 isForTrain: True
 
 howtogetpizero: simple_IC
+
+
+feat_in:
+  tau:
+    n: 2
+    features:
+      - pt
+      - ptCorrPNet
+      - eta
+      - phi
+      - mass
+      - dxy
+      - dz
+      - rawDeepTau2018v2p5VSe
+      - rawDeepTau2018v2p5VSjet
+      - rawDeepTau2018v2p5VSmu
+      - rawIsodR03
+      - rawMVAnewDM2017v2
+      - leadTkPtOverTauPt
+      - rawPNetVSe
+      - rawPNetVSjet
+      - rawPNetVSmu
+      - charge@cat
+      - decayModePNet@cat
+      - probDM0PNet
+      - probDM10PNet
+      - probDM11PNet
+      - probDM1PNet
+      - probDM2PNet
+  jet: 
+    n: 10
+    features:
+      - pt
+      - eta
+      - phi
+      - mass
+      - btagPNetB
+      - btagDeepFlavB
+  tauprod:
+    n: 10
+    features:
+      - pt
+      - eta
+      - phi
+      - mass
+      - pdgId
+      - charge

@@ -31,6 +31,7 @@ class FeatureExtraction:
                  gentauprods: ak.Array,
                  gentaunus: ak.Array,
                  jets: ak.Array,
+                 feat_indict: dict,
                  isnorm: Optional[bool]=False,
                  isForTrain: Optional[bool]=False):
         self.events = events
@@ -43,12 +44,21 @@ class FeatureExtraction:
                           "probDM0PNet", "probDM10PNet", "probDM11PNet", "probDM1PNet", "probDM2PNet"]
         self.tau1prods = ak.firsts(tauprods[:,:1], axis=1)
         self.tau2prods = ak.firsts(tauprods[:,1:2], axis=1)
+        #self.tauprod_feats = [""]
         self.gentaus = gentaus
         self.gentauprods = gentauprods
         self.gentaunus = gentaunus
         self.jets = jets
         self.jet_feats = ["pt", "eta", "phi", "mass", "btagPNetB", "btagDeepFlavB"]
         self.met = events.MET
+        #self.feat_indict = feature_indict
+        self.nMaxTaus = feat_indict.tau.n
+        self.tau_feats = feat_indict.tau.features
+        self.nMaxJets = feat_indict.jet.n
+        self.jet_feats = feat_indict.jet.features
+        self.nMaxTauProds = feat_indict.tauprod.n
+        self.tauprod_feats = feat_indict.tauprod.features
+
         self.isnorm = isnorm
         self.isForTrain = isForTrain
 
@@ -131,11 +141,22 @@ class FeatureExtraction:
         if tag == "tau":
             objs = self.taus
             featlist = self.tau_feats
-            maxidx = 2
+            maxidx = self.nMaxTaus
         elif tag == "jet":
             objs = self.jets
             featlist = self.jet_feats
-            maxidx = 15
+            maxidx = self.nMaxJets
+        elif tag == "tau1prod":
+            objs = self.tau1prods
+            featlist = self.tauprod_feats
+            maxidx = self.nMaxTauProds
+        elif tag == "tau2prod":
+            objs = self.tau2prods
+            featlist = self.tauprod_feats
+            maxidx = self.nMaxTauProds
+        else:
+            logger.error("proper tag is not mentioned in node feaure selection ...")
+            raise RuntimeError("tag: tau / jet / tau1prod / tau2prod")
 
         keys, feats = self.get_feats_per_obj(objs, featlist, maxidx, tag)
         logger.info(f"Total node feats: {len(keys)}")
@@ -492,6 +513,8 @@ class FeatureExtraction:
         np_manual_node_feats, manual_node_keys = self.getmanuals()
         np_tau_node_feats, tau_node_keys = self.getnodes("tau")
         np_jet_node_feats, jet_node_keys = self.getnodes("jet")
+        np_tau1prod_node_feats, tau1prod_node_keys = self.getnodes("tau1prod")
+        np_tau2prod_node_feats, tau2prod_node_keys = self.getnodes("tau2prod")
         np_global_feats, global_keys = self.getglobals(self.global_var_to_keep())
         np_target_feats, target_keys = self.gettargets()
 
@@ -499,15 +522,19 @@ class FeatureExtraction:
         logger.info("details: ===>")
         logger.info(f"manual   : {np_manual_node_feats.shape}, {len(manual_node_keys)}")
         logger.info(f"node_tau : {np_tau_node_feats.shape}, {len(tau_node_keys)}")
+        logger.info(f"node_tau1prod: {np_tau1prod_node_feats.shape}, {len(tau1prod_node_keys)}")
+        logger.info(f"node_tau2prod: {np_tau2prod_node_feats.shape}, {len(tau2prod_node_keys)}")
         logger.info(f"node_jet : {np_jet_node_feats.shape}, {len(jet_node_keys)}")
         logger.info(f"global   : {np_global_feats.shape}, {len(global_keys)}")
         logger.info(f"target   : {np_target_feats.shape}, {len(target_keys)}")
 
         all_feats = np.concatenate((np_manual_node_feats, 
                                     np_tau_node_feats,
+                                    np_tau1prod_node_feats,
+                                    np_tau2prod_node_feats,
                                     np_jet_node_feats,
                                     np_global_feats,
                                     np_target_feats), axis=1)
-        all_keys = manual_node_keys + tau_node_keys + jet_node_keys + global_keys + target_keys
+        all_keys = manual_node_keys + tau_node_keys + tau1prod_node_keys + tau2prod_node_keys + jet_node_keys + global_keys + target_keys
 
         return all_feats, all_keys

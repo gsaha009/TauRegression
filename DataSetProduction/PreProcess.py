@@ -57,7 +57,8 @@ def setup_logger(log_file):
 # ----------------------------------------------------------------------------------------------------- #
 #                                            main script                                                #
 # ----------------------------------------------------------------------------------------------------- #
-def get_features_df(events, tau1dm, tau2dm, isForTrain, howtogetpizero, isnorm):
+def get_features_df(events, tau1dm, tau2dm, isForTrain, howtogetpizero, isnorm,
+                    feat_indict):
 
     sel_evt_object = SelectEvents(events = events,
                                   tau1dm = tau1dm,
@@ -78,6 +79,7 @@ def get_features_df(events, tau1dm, tau2dm, isForTrain, howtogetpizero, isnorm):
                                             sel_evt_dict["gen_tauprods"],
                                             sel_evt_dict["gen_taunus"],
                                             sel_evt_dict["jets"],
+                                            feat_indict,
                                             isnorm = isnorm,
                                             isForTrain = isForTrain)
     
@@ -117,6 +119,8 @@ def main():
     isForTrain = config.get("isForTrain")
     howtogetpizero = config.get("howtogetpizero")
 
+    feat_indict = obj(config.get("feat_in"))
+
     if not os.path.exists(outdir):
         os.mkdir(outdir)
     else:
@@ -138,7 +142,8 @@ def main():
         logger.info(f"nEvents: {ak.num(events.event, axis=0)}")
         logger.info(f"Event Fields: {events.fields}")
 
-        df, cut_flow_dict = get_features_df(events, tau1dm, tau2dm, isForTrain, howtogetpizero, isnorm)
+        df, cut_flow_dict = get_features_df(events, tau1dm, tau2dm, isForTrain, howtogetpizero, isnorm,
+                                            feat_indict)
 
         if index == 0:
             #from IPython import embed; embed()
