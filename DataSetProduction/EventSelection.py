@@ -179,6 +179,23 @@ class SelectEvents:
         logger.info("jet selection done")
         return SelectionResult, sel_jet_indices
 
+    @staticmethod    
+    def sort_pions(pions):
+        empty = pions[:,:0]
+        #embed()
+        pions_with_pos_charge = pions[pions.pdgId > 0]
+        pions_with_neg_charge = pions[pions.pdgId < 0]
+        has2pospions = ak.sum(ak.num(pions_with_pos_charge.pdgId, axis=-1), axis=1) == 2
+        has2negpions = ak.sum(ak.num(pions_with_neg_charge.pdgId, axis=-1), axis=1) == 2
+        #print(has2pospions)
+        #print(has2negpions)
+
+        sorted_pions = ak.where(has2pospions, pions[ak.argsort(pions.pdgId, ascending=True)], empty)
+        sorted_pions = ak.where(has2negpions, pions[ak.argsort(pions.pdgId, ascending=False)], sorted_pions)
+
+        #sorted_pions = pions[sorted_pions_indices]
+        return sorted_pions
+
 
 
     def gentauandprods_selection(self):
@@ -200,9 +217,43 @@ class SelectEvents:
     
         # get tau products
         gentau_children = gentau.distinctChildren
+
+        # separate the decay foir tau1 and tau2
+        gentau1 = gentau[:,0:1]
+        gentau2 = gentau[:,1:2]
+        decay_gentau1 = gentau_children[:,0:1]
+        decay_gentau2 = gentau_children[:,1:2]
+        gendummy = gentau1[:,:0]
         
+        ispion   = lambda col: (np.abs(col.pdgId) == 211) | (np.abs(col.pdgId) == 321)
+        ispizero = lambda col: (np.abs(col.pdgId) == 111) | (np.abs(col.pdgId) == 311) | (np.abs(col.pdgId) == 130) | (np.abs(col.pdgId) == 310)
+
+        pions_tau1 = decay_gentau1[ispion(decay_gentau1)]
+        pions_tau2 = decay_gentau2[ispion(decay_gentau2)]
+
+        # if 3 pions
+        npions_tau1 = ak.sum(ak.num(pions_tau1.pdgId, axis=-1), axis=1)
+        npions_tau2 = ak.sum(ak.num(pions_tau2.pdgId, axis=-1), axis=1)
+        has3pions_tau1 = npions_tau1 == 3 # [[], [False], [True], [], ...., [True]]
+        has3pions_tau2 = npions_tau2 == 3 # [[], [False], [True], [], ...., [True]]
+
+        #embed()
+        
+        sorted_pions_tau1 = ak.where(has3pions_tau1, self.sort_pions(pions_tau1), pions_tau1)
+        sorted_pions_tau2 = ak.where(has3pions_tau2, self.sort_pions(pions_tau2), pions_tau2)
+
+        pizeros_tau1 = decay_gentau1[ispizero(decay_gentau1)]
+        pizeros_tau2 = decay_gentau2[ispizero(decay_gentau2)]
+
+        #tau1AndProds = ak.concatenate([gentau1[:,None], pions_tau1[:,:None], pizeros_tau1[:,:None]], axis=1)
+        #tau2AndProds = ak.concatenate([gentau2[:,None], pions_tau2[:,:None], pizeros_tau2[:,:None]], axis=1)
+
         #embed()
         #1/0
+
+        tau1AndProds = ak.concatenate([gentau1[:,None], sorted_pions_tau1, pizeros_tau1], axis=1)
+        tau2AndProds = ak.concatenate([gentau2[:,None], sorted_pions_tau2, pizeros_tau2], axis=1)
+
         SelectionResult = {
             "steps": {
                 "gentau_selection: has 2 gentau": (ak.num(gentau.pdgId, axis=1) == 2),
@@ -211,7 +262,7 @@ class SelectEvents:
             },
         }
         logger.info("gentaus and products selection done: gonna be used if isForTrain = True")
-        return SelectionResult, gentau, gentau_children
+        return SelectionResult, gentau, gentau_children, tau1AndProds, tau2AndProds
 
 
     def prod_selection(self, evt_dict, tau_sel_idx):
@@ -262,12 +313,41 @@ class SelectEvents:
         pions    = ak.where(tau_prod_evt_mask, tauprods_concat[is_pi], empty_indices)
         pions_p4 = getp4(pions)
 
+        # sorting pions
+
+        pions_p4_tau1 = pions_p4[:,0:1]  # will be used to concat tau and its decay products
+        pions_p4_tau2 = pions_p4[:,1:2]  # will be used to concat tau and its decay products
+
+        # count the number of pions
+        npions_tau1 = ak.sum(ak.num(pions_p4_tau1.pdgId, axis=-1), axis=1)
+        npions_tau2 = ak.sum(ak.num(pions_p4_tau2.pdgId, axis=-1), axis=1)
+        has3pions_tau1 = npions_tau1 == 3 # [[], [False], [True], [], ...., [True]]
+        has3pions_tau2 = npions_tau2 == 3 # [[], [False], [True], [], ...., [True]]
+
+        #embed()
+        
+        sorted_pions_p4_tau1 = ak.where(has3pions_tau1, self.sort_pions(pions_p4_tau1), pions_p4_tau1)
+        sorted_pions_p4_tau2 = ak.where(has3pions_tau2, self.sort_pions(pions_p4_tau2), pions_p4_tau2)
+        
+        #sorted_pions_p4 = ak.concatenate([sorted_pions_p4_tau1, sorted_pions_p4_tau2], axis=1)
+
+
+        #embed()
+        #1/0
+        
+
         photons = ak.where(tau_prod_evt_mask, tauprods_concat[is_gm], empty_indices)
         sorted_idx_photons = ak.argsort(photons.pt, ascending=False)
         photons = photons[sorted_idx_photons] # already sorted before
         # add photons p4 and later sum those p4s in the simple_IC method
         photons_p4 = getp4(photons)
 
+
+        taus_p4 = getp4(taus)
+        tau_p4_1 = taus_p4[:,0:1] # will be used to concat tau and its decay products
+        tau_p4_2 = taus_p4[:,1:2] # will be used to concat tau and its decay products
+
+        
 
         evt_mask_1 = events.event >= 0
         evt_mask_2 = events.event >= 0
@@ -276,10 +356,18 @@ class SelectEvents:
             if self.isForTrain:
                 one_prong = (gentaus.DM == 1)
                 evt_mask_2 = ak.sum(one_prong, axis=1) == 2
+        elif self.tau1dm == 10 and self.tau2dm == 10:
+            evt_mask_1 = ak.sum(has_three_pions, axis=1) >= 2
+            if self.isForTrain:
+                three_prong = (gentaus.DM == 10)
+                evt_mask_2 = ak.sum(three_prong, axis=1) == 2
 
 
-        
+        pizero_p4_tau1 = getp4(photons[:,0:1]) # dummy
+        pizero_p4_tau2 = getp4(photons[:,0:1]) # dummy
         pizeros_p4 = getp4(photons[:,0:1]) # dummy
+
+
         if self.howtogetpizero == "simple_IC":
             eta_pizeros  = ak.firsts(photons_p4.eta, axis=-1)[:,:,None]
             phi_pizeros  = ak.firsts(photons_p4.phi, axis=-1)[:,:,None]
@@ -300,6 +388,8 @@ class SelectEvents:
                 with_name="PtEtaPhiMLorentzVector",
                 behavior=vector.behavior
             )
+            pizero_p4_tau1 = pizeros_p4[:, 0:1] # will be used to concat tau and its decay products   
+            pizero_p4_tau2 = pizeros_p4[:, 1:2] # will be used to concat tau and its decay products   
 
 
         elif self.howtogetpizero == "simple_MB":
@@ -440,6 +530,8 @@ class SelectEvents:
             pizeros_p4 = ak.concatenate([sel_strip_pizero_tau1_p4[:,None], sel_strip_pizero_tau2_p4[:,None]], axis=1)
             pizeros_p4 = setp4_(pizeros_p4, pdgId = 111)
 
+            pizero_p4_tau1 = pizeros_p4[:, 0:1] # will be used to concat tau and its decay products   
+            pizero_p4_tau2 = pizeros_p4[:, 1:2] # will be used to concat tau and its decay products   
 
 
         elif self.howtogetpizero == "XGB_MB":
@@ -448,18 +540,28 @@ class SelectEvents:
         else:
             raise RuntimeError("wrong method for howtogetpizero")
 
+
+        #embed()
+        #1/0
+        # concat tau and its decay products   
+        tau1AndProds = ak.concatenate([tau_p4_1[:,None], sorted_pions_p4_tau1, pizero_p4_tau1], axis=1)
+        tau2AndProds = ak.concatenate([tau_p4_2[:,None], sorted_pions_p4_tau2, pizero_p4_tau2], axis=1)
         
         tauprod_results = {
             "steps": {
                 #"tau prods with pi and pi0": tau_prod_evt_mask,
                 "tau prods with pi and pi0": evt_mask_1,
-                "gen DM 11"                : evt_mask_2,
+                "for train: gen DM 11"     : evt_mask_2,
             },
         }
         new_events_dict = evt_dict | {"gen_taunus": gentaunus,
                                       "det_tauprods_concat": tauprods_concat,
+                                      #"det_sorted_pions": sorted_pions_p4,
                                       "det_pions": pions_p4,
-                                      "det_pizeros": pizeros_p4}
+                                      #"det_pions": sorted_pions_p4,
+                                      "det_pizeros": pizeros_p4,
+                                      "det_tau1_and_prods": tau1AndProds,
+                                      "det_tau2_and_prods": tau2AndProds}
         # save nPions and nPhotons later :: MUST
         
         logger.info("tau prods selection done")
@@ -471,7 +573,7 @@ class SelectEvents:
         evt_cut_flow = dict()
         muon_results, muon_indices         = self.muon_selection()
         electron_results, electron_indices = self.electron_selection(muon_indices)
-        gentau_results, gentaus, gentau_products = self.gentauandprods_selection()
+        gentau_results, gentaus, gentau_products, gentau1AndProds, gentau2AndProds = self.gentauandprods_selection()
         tau_results, tau_indices           = self.tau_selection(electron_indices, muon_indices, gentaus)
         jet_results, jet_indices           = self.jet_selection(electron_indices, muon_indices, tau_indices)
 
@@ -490,6 +592,8 @@ class SelectEvents:
         events = self.events[event_mask]
         gentaus = gentaus[event_mask]
         gentau_products = gentau_products[event_mask]
+        gentau1AndProds = gentau1AndProds[event_mask]
+        gentau2AndProds = gentau2AndProds[event_mask]
         sel_tau_indices = tau_indices[event_mask]
         taus = events.Tau[sel_tau_indices]
         sel_jet_indices = jet_indices[event_mask]
@@ -500,6 +604,8 @@ class SelectEvents:
                     "det_tauprods": events.TauProd,
                     "gen_taus": gentaus,
                     "gen_tauprods": gentau_products,
+                    "gen_tau1_and_prods": gentau1AndProds,
+                    "gen_tau2_and_prods": gentau2AndProds,
                     "jets": jets}
 
         #self.print_cutflow(evt_cut_flow)

@@ -20,6 +20,7 @@ from coffea.nanoevents.methods import vector
 from tqdm.notebook import tqdm
 import itertools
 from typing import Optional
+from IPython import embed
 
 from util import *
 from PhiCPComp import PhiCPComp
@@ -42,7 +43,7 @@ def setup_logger(log_file):
     console_handler.setLevel(logging.DEBUG)
 
     # Create a formatter and add it to the file handler
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter('%(asctime)s,%(msecs)03d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s','%Y-%m-%d:%H:%M:%S')
     file_handler.setFormatter(formatter)
     console_handler.setFormatter(formatter)
 
@@ -63,8 +64,12 @@ def get_features_df(events, tau1dm, tau2dm, isForTrain, howtogetpizero, isnorm):
                                   tau2dm = tau2dm,
                                   isForTrain = isForTrain,
                                   howtogetpizero = howtogetpizero)
-
     sel_evt_dict, cut_flow_dict = sel_evt_object.apply_selections()
+
+    #logger.info("Event dict produced, keys: {str(list(sel_evt_dict.keys()))}")
+
+    #embed()
+    #1/0
 
     feat_extract_object = FeatureExtraction(sel_evt_dict["events"],
                                             sel_evt_dict["det_taus"],
